@@ -24,7 +24,7 @@ function App() {
   };
 
   return (
-    <Router>
+    <Router basename="/registro-chamados">
       <Routes>
         <Route 
           path="/login" 
