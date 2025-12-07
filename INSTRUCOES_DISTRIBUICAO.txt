@@ -1,0 +1,110 @@
+==========================================
+REGISTRO DE CHAMADOS - PINGDESK
+Instruções de Distribuição
+==========================================
+
+✅ EXECUTÁVEL CRIADO COM SUCESSO!
+
+Localização do arquivo:
+📁 C:\Users\conta\Desktop\RegistroChamados\dist\RegistroChamados.exe
+
+------------------------------------------
+COMO DISTRIBUIR AOS COLABORADORES
+------------------------------------------
+
+1. PREPARAR PACOTE DE INSTALAÇÃO:
+   
+   Crie uma pasta chamada "RegistroChamados_Instalador" e inclua:
+   
+   ✓ RegistroChamados.exe (da pasta dist)
+   ✓ firebase-key.json (arquivo de credenciais Firebase)
+   ✓ Pasta "assets" completa (com o favicon.ico)
+   
+   Estrutura da pasta:
+   RegistroChamados_Instalador/
+   ├── RegistroChamados.exe
+   ├── firebase-key.json
+   └── assets/
+       └── favicon.ico
+
+2. COMPACTAR:
+   
+   - Clique com botão direito na pasta "RegistroChamados_Instalador"
+   - Selecione "Enviar para" → "Pasta compactada (zipada)"
+   - Renomeie para: RegistroChamados_v1.0.zip
+
+3. DISTRIBUIR:
+   
+   Envie o arquivo .zip para seus colaboradores via:
+   - E-mail
+   - Google Drive / OneDrive
+   - WhatsApp / Telegram
+   - Pen drive
+
+------------------------------------------
+INSTRUÇÕES PARA OS COLABORADORES
+------------------------------------------
+
+📥 INSTALAÇÃO:
+
+1. Extrair o arquivo .zip
+2. Copiar a pasta "RegistroChamados_Instalador" para:
+   C:\Arquivos de Programas\ 
+   ou
+   C:\Users\[seu_usuario]\Documents\
+
+3. Executar o arquivo "RegistroChamados.exe"
+
+💡 PRIMEIRO USO:
+
+- Login: admin
+- Senha: 1234
+
+⚠️ Altere a senha padrão no menu "Gerenciar Usuários"!
+
+------------------------------------------
+FUNCIONALIDADES
+------------------------------------------
+
+✓ Registro de chamados
+✓ Envio automático para Telegram
+✓ Gerenciamento de usuários
+✓ Gerenciamento de provedores
+✓ Gerenciamento de níveis de atendimento
+✓ Integração com Firebase (banco de dados em nuvem)
+
+------------------------------------------
+REQUISITOS DO SISTEMA
+------------------------------------------
+
+• Windows 10 ou superior
+• Conexão com internet (para Firebase e Telegram)
+• 100 MB de espaço em disco
+• 2 GB de RAM (mínimo)
+
+------------------------------------------
+CONFIGURAÇÃO DO TELEGRAM
+------------------------------------------
+
+1. Acesse o Painel de Administração
+2. Vá na aba "Telegram"
+3. Configure o Chat ID do grupo
+4. Teste a conexão
+
+Chat ID atual: -1003349243615
+Token do bot: 8353262305:AAG_kMgFVLGRQ8EwQjhyEUAkeOWBH-kTYhs
+
+------------------------------------------
+SUPORTE
+------------------------------------------
+
+Em caso de problemas:
+1. Verifique se o arquivo firebase-key.json está na mesma pasta do .exe
+2. Verifique se a pasta "assets" está presente
+3. Verifique a conexão com internet
+4. Entre em contato com o administrador do sistema
+
+==========================================
+Versão: 1.0
+Data: 07/12/2025
+==========================================

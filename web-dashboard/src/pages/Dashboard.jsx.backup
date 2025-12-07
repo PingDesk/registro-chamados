@@ -1,0 +1,284 @@
+import React, { useState, useEffect } from 'react';
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { 
+  LogOut, 
+  Download, 
+  Search, 
+  Filter,
+  Calendar,
+  User,
+  Clock,
+  TrendingUp,
+  AlertCircle,
+  Menu,
+  X,
+  LayoutDashboard,
+  Building2,
+  Users
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
+import StatsCard from '../components/StatsCard';
+import TicketTable from '../components/TicketTable';
+import ChartsSection from '../components/ChartsSection';
+import Provedores from './Provedores';
+import Acessos from './Acessos';
+import './Dashboard.css';
+
+function Dashboard({ user, onLogout }) {
+  const [chamados, setChamados] = useState([]);
+  const [filteredChamados, setFilteredChamados] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('todos');
+  const [filterProvider, setFilterProvider] = useState('todos');
+  const [providers, setProviders] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [chamados, searchTerm, filterStatus, filterProvider]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Carregar chamados
+      const chamadosRef = collection(db, 'chamados');
+      const chamadosQuery = query(chamadosRef, orderBy('data_hora', 'desc'));
+      const chamadosSnapshot = await getDocs(chamadosQuery);
+      const chamadosData = chamadosSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setChamados(chamadosData);
+
+      // Carregar provedores
+      const provedoresRef = collection(db, 'provedores');
+      const provedoresSnapshot = await getDocs(provedoresRef);
+      const provedoresData = provedoresSnapshot.docs.map(doc => doc.data().nome);
+      setProviders(provedoresData);
+
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      alert('Erro ao carregar os dados');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...chamados];
+
+    // Filtro de busca
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(chamado =>
+        chamado.descricao?.toLowerCase().includes(term) ||
+        chamado.usuario?.toLowerCase().includes(term) ||
+        chamado.provedor?.toLowerCase().includes(term) ||
+        chamado.cliente?.toLowerCase().includes(term)
+      );
+    }
+
+    // Filtro de status
+    if (filterStatus !== 'todos') {
+      filtered = filtered.filter(chamado => chamado.status === filterStatus);
+    }
+
+    // Filtro de provedor
+    if (filterProvider !== 'todos') {
+      filtered = filtered.filter(chamado => chamado.provedor === filterProvider);
+    }
+
+    setFilteredChamados(filtered);
+  };
+
+  const exportToExcel = () => {
+    const data = filteredChamados.map(chamado => ({
+      'Data/Hora': chamado.data_hora,
+      'Usuário': chamado.usuario,
+      'Cliente': chamado.cliente,
+      'Provedor': chamado.provedor,
+      'Nível': chamado.nivel,
+      'Descrição': chamado.descricao,
+      'Status': chamado.status
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Chamados');
+    
+    const fileName = `chamados_${format(new Date(), 'yyyy-MM-dd_HHmmss')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  const stats = {
+    total: chamados.length,
+    abertos: chamados.filter(c => c.status === 'Aberto').length,
+    emAndamento: chamados.filter(c => c.status === 'Em Andamento').length,
+    fechados: chamados.filter(c => c.status === 'Fechado').length
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Carregando dados...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-container">
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+          <h2>PingDesk</h2>
+          <button className="toggle-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+        
+        <nav className="sidebar-nav">
+          <button 
+            className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('dashboard')}
+          >
+            <LayoutDashboard size={20} />
+            {sidebarOpen && <span>Dashboard</span>}
+          </button>
+          <button 
+            className={`nav-item ${currentPage === 'provedores' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('provedores')}
+          >
+            <Building2 size={20} />
+            {sidebarOpen && <span>Provedores</span>}
+          </button>
+          
+          <button 
+            className={`nav-item ${currentPage === 'acessos' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('acessos')}
+          >
+            <Users size={20} />
+            {sidebarOpen && <span>Acessos</span>}
+          </button>
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <div className="main-wrapper">
+              <div>
+                <h1>
+                  {currentPage === 'dashboard' ? 'Dashboard' : 
+                   currentPage === 'provedores' ? 'Provedores' : 'Acessos'}
+                </h1>
+                <p>Bem-vindo, {user.usuario}</p>
+              </div>barOpen && (
+                <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
+                  <Menu size={24} />
+                </button>
+              )}
+              <div>
+                <h1>{currentPage === 'dashboard' ? 'Dashboard' : 'Provedores'}</h1>
+                <p>Bem-vindo, {user.usuario}</p>
+              </div>
+            </div>
+            <button className="logout-btn" onClick={onLogout}>
+              <LogOut size={20} />
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <main className="dashboard-main">
+          {currentPage === 'dashboard' ? (
+            <>
+              <div className="stats-grid">
+          <StatsCard 
+            title="Total de Chamados" 
+            value={stats.total} 
+            icon={<TrendingUp />}
+            color="#667eea"
+          />
+          <StatsCard 
+            title="Abertos" 
+            value={stats.abertos} 
+            icon={<AlertCircle />}
+            color="#f59e0b"
+          />
+          <StatsCard 
+            title="Em Andamento" 
+            value={stats.emAndamento} 
+            icon={<Clock />}
+            color="#3b82f6"
+          />
+          <StatsCard 
+            title="Fechados" 
+            value={stats.fechados} 
+            icon={<Calendar />}
+            color="#10b981"
+          />
+        </div>
+
+        <ChartsSection chamados={chamados} />
+
+        <div className="filters-section">
+          <div className="search-box">
+            <Search size={20} />
+            <input
+              type="text"
+              placeholder="Buscar por descrição, usuário, cliente ou provedor..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="filters">
+            <div className="filter-group">
+              <Filter size={18} />
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="todos">Todos os Status</option>
+                <option value="Aberto">Aberto</option>
+                <option value="Em Andamento">Em Andamento</option>
+                <option value="Fechado">Fechado</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <User size={18} />
+              <select value={filterProvider} onChange={(e) => setFilterProvider(e.target.value)}>
+                <option value="todos">Todos os Provedores</option>
+                {providers.map(provider => (
+                  <option key={provider} value={provider}>{provider}</option>
+                ))}
+              </select>
+            </div>
+
+            <button className="export-btn" onClick={exportToExcel}>
+              <Download size={20} />
+              Exportar Excel
+            </button>
+          </div>
+        </div>
+
+        <TicketTable chamados={filteredChamados} onRefresh={loadData} />
+            </>
+          ) : currentPage === 'provedores' ? (
+            <Provedores />
+          ) : currentPage === 'acessos' ? (
+            <Acessos />
+          ) : null}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default Dashboard;

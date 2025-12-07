@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atualizar Tipos de Usuários</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    .success {
+      background: #10b981;
+      color: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    .error {
+      background: #ef4444;
+      color: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    .info {
+      background: #3b82f6;
+      color: white;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    pre {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .usuario-item {
+      background: #f9fafb;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔄 Atualizar Tipos de Usuários</h1>
+    <p>Este script atualiza os usuários existentes no Firestore adicionando o campo <strong>tipo</strong>.</p>
+    
+    <div class="info">
+      <strong>Regras de Atualização:</strong>
+      <ul>
+        <li><strong>admin</strong> → Administrador</li>
+        <li><strong>Outros usuários sem tipo</strong> → Colaborador (padrão)</li>
+      </ul>
+    </div>
+
+    <button onclick="listarUsuarios()">1. Listar Usuários Atuais</button>
+    <button onclick="atualizarTipos()">2. Atualizar Tipos</button>
+
+    <div id="resultado"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getFirestore, collection, getDocs, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDWxSxMTkHfbjZcH_HQ52Gk_e-y7VfU5a8",
+      authDomain: "app-pingdesk.firebaseapp.com",
+      projectId: "app-pingdesk",
+      storageBucket: "app-pingdesk.firebasestorage.app",
+      messagingSenderId: "1058819846849",
+      appId: "1:1058819846849:web:3ec64f2a8e6a33e1e82a7e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.listarUsuarios = async function() {
+      const resultado = document.getElementById('resultado');
+      resultado.innerHTML = '<div class="info">Carregando usuários...</div>';
+
+      try {
+        const querySnapshot = await getDocs(collection(db, 'usuarios'));
+        let html = '<h3>Usuários Encontrados:</h3>';
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          html += `
+            <div class="usuario-item">
+              <strong>ID:</strong> ${doc.id}<br>
+              <strong>Nome:</strong> ${data.nome || 'Não definido'}<br>
+              <strong>Tipo Atual:</strong> ${data.tipo || '<em>SEM TIPO</em>'}<br>
+              <strong>Senha:</strong> ${data.senha ? '***' : 'Não definida'}
+            </div>
+          `;
+        });
+
+        resultado.innerHTML = html;
+      } catch (error) {
+        resultado.innerHTML = `<div class="error">Erro ao listar usuários: ${error.message}</div>`;
+        console.error(error);
+      }
+    };
+
+    window.atualizarTipos = async function() {
+      const resultado = document.getElementById('resultado');
+      resultado.innerHTML = '<div class="info">Atualizando tipos de usuários...</div>';
+
+      try {
+        const querySnapshot = await getDocs(collection(db, 'usuarios'));
+        let updated = 0;
+        let skipped = 0;
+        let html = '<h3>Resultado da Atualização:</h3>';
+
+        for (const docSnap of querySnapshot.docs) {
+          const data = docSnap.data();
+          
+          // Se já tem tipo, pula
+          if (data.tipo) {
+            skipped++;
+            continue;
+          }
+
+          // Define tipo baseado no nome
+          let tipo = 'Colaborador'; // Padrão
+          if (data.nome === 'admin') {
+            tipo = 'Administrador';
+          }
+
+          // Atualiza o documento
+          await updateDoc(doc(db, 'usuarios', docSnap.id), {
+            tipo: tipo
+          });
+
+          updated++;
+          html += `
+            <div class="usuario-item">
+              ✅ <strong>${data.nome}</strong> → Tipo: <strong>${tipo}</strong>
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="success">
+            <strong>Atualização Concluída!</strong><br>
+            ${updated} usuário(s) atualizado(s)<br>
+            ${skipped} usuário(s) já tinham tipo definido
+          </div>
+        `;
+
+        resultado.innerHTML = html;
+      } catch (error) {
+        resultado.innerHTML = `<div class="error">Erro ao atualizar tipos: ${error.message}</div>`;
+        console.error(error);
+      }
+    };
+  </script>
+</body>
+</html>

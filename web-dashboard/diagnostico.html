@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Firestore</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        pre {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico Firestore</h1>
+    <button onclick="diagnosticar()">Executar Diagnóstico</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD6TBH1AQ24g-UPw8nXJQUIdxfBrK9uaGI",
+            authDomain: "app-pingdesk.firebaseapp.com",
+            projectId: "app-pingdesk",
+            storageBucket: "app-pingdesk.firebasestorage.app",
+            messagingSenderId: "518825513254",
+            appId: "1:518825513254:web:baa4af831f56c5f7f8a2a2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.diagnosticar = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            function log(msg) {
+                output.innerHTML += msg + '\n';
+            }
+
+            try {
+                log('=== DIAGNÓSTICO FIRESTORE ===\n');
+                
+                // Listar todos os usuários
+                log('\n📋 USUÁRIOS CADASTRADOS:');
+                const usuariosSnap = await getDocs(collection(db, 'usuarios'));
+                log(`Total: ${usuariosSnap.size} usuário(s)\n`);
+                
+                if (usuariosSnap.empty) {
+                    log('<span class="error">❌ NENHUM USUÁRIO ENCONTRADO!</span>');
+                    log('Execute o script init-firestore.html primeiro!\n');
+                } else {
+                    usuariosSnap.forEach((doc, index) => {
+                        const data = doc.data();
+                        log(`\nUsuário ${index + 1}:`);
+                        log(`  ID: ${doc.id}`);
+                        log(`  Campo 'usuario': "${data.usuario}"`);
+                        log(`  Campo 'senha': "${data.senha}"`);
+                        log(`  Campo 'tipo': "${data.tipo}"`);
+                        log(`  Todos os campos: ${JSON.stringify(data, null, 2)}`);
+                    });
+                }
+
+                // Teste de busca
+                log('\n\n🔍 TESTE DE BUSCA:');
+                log('Buscando usuário: "admin@pingdesk.com.br"');
+                
+                const { query, where } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+                const q = query(collection(db, 'usuarios'), where('usuario', '==', 'admin@pingdesk.com.br'));
+                const searchSnap = await getDocs(q);
+                
+                log(`Resultado: ${searchSnap.size} documento(s) encontrado(s)`);
+                
+                if (!searchSnap.empty) {
+                    searchSnap.forEach(doc => {
+                        log(`<span class="success">✅ Encontrado! ID: ${doc.id}</span>`);
+                    });
+                } else {
+                    log('<span class="error">❌ NÃO ENCONTRADO!</span>');
+                }
+
+            } catch (error) {
+                log(`\n<span class="error">❌ ERRO: ${error.message}</span>`);
+                log(`Código: ${error.code}`);
+                console.error(error);
+            }
+        }
+
+        // Auto-executar
+        window.addEventListener('load', () => {
+            setTimeout(diagnosticar, 500);
+        });
+    </script>
+</body>
+</html>
