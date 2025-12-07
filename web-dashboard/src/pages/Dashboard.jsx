@@ -380,11 +380,12 @@ function Dashboard({ user, onLogout }) {
         'Valor Total': valores.massivo
       });
 
-      // Vendas - agora mostra soma das comissões
+      // Vendas - mostra soma das comissões com percentual do provedor
       const vendasCount = stats.vendas;
-      const vendasTotal = valores.vendas; // Já é a soma das comissões (10%)
+      const vendasTotal = valores.vendas; // Já é a soma das comissões
+      const percentualComissao = provider.comissao || 10; // Padrão 10% se não configurado
       fechamentoData.push({
-        'Item': 'Vendas (Comissão 10%)',
+        'Item': `Vendas (Comissão ${percentualComissao}%)`,
         'Quantidade': vendasCount,
         'Valor Unitário': vendasCount > 0 ? (vendasTotal / vendasCount).toFixed(2) : 0,
         'Valor Total': vendasTotal

@@ -707,8 +707,19 @@ class ChamadoApp(QWidget):
                 return
             try:
                 valor_venda_num = float(valor_venda_text.replace(',', '.'))
-                # Calcula 10% de comissão
-                comissao = valor_venda_num * 0.10
+                
+                # Busca porcentagem de comissão do provedor
+                provedor_nome = self.provedor.currentText()
+                percentual_comissao = 10  # Padrão 10%
+                provedores_ref = db.collection('provedores')
+                docs = provedores_ref.where('nome', '==', provedor_nome).stream()
+                for doc in docs:
+                    provedor_data = doc.to_dict()
+                    percentual_comissao = float(provedor_data.get('comissao', 10))
+                    break
+                
+                # Calcula comissão baseada no percentual do provedor
+                comissao = valor_venda_num * (percentual_comissao / 100)
             except ValueError:
                 QMessageBox.warning(self, "Erro", "Valor inválido. Use apenas números (ex: 150.00)")
                 return
@@ -735,7 +746,7 @@ class ChamadoApp(QWidget):
         print(f"  - Data/Hora: {data_hora}")
         if valor_venda_num:
             print(f"  - Valor Venda: R$ {valor_venda_num:.2f}")
-            print(f"  - Comissão (10%): R$ {comissao:.2f}")
+            print(f"  - Comissão ({percentual_comissao}%): R$ {comissao:.2f}")
 
         # Prepara dados do chamado
         chamado_data = {
@@ -753,6 +764,7 @@ class ChamadoApp(QWidget):
         if valor_venda_num is not None:
             chamado_data['valorVenda'] = valor_venda_num
             chamado_data['comissao'] = comissao
+            chamado_data['percentualComissao'] = percentual_comissao  # Salva o percentual usado
 
         # Insere chamado no Firestore
         db.collection('chamados').add(chamado_data)
@@ -771,7 +783,7 @@ class ChamadoApp(QWidget):
         # Adiciona informações de venda na mensagem do Telegram
         if valor_venda_num is not None:
             mensagem += f"<b>Valor da Venda:</b> R$ {valor_venda_num:.2f}\n"
-            mensagem += f"<b>Comissão (10%):</b> R$ {comissao:.2f}\n"
+            mensagem += f"<b>Comissão ({percentual_comissao}%):</b> R$ {comissao:.2f}\n"
         
         mensagem += f"<b>Descrição:</b> {descricao}"
         
