@@ -134,18 +134,18 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     const posicao = chamadosDoProvedor.findIndex(c => c.id === chamado.id) + 1;
     const franquia = parseInt(provedor.franquia) || 0;
 
+    // Verificar se é uma venda - sempre retorna R$ 0,00 na tabela
+    const nivel = (chamado.nivel || '').toLowerCase().trim();
+    if (nivel.includes('venda')) {
+      return 'R$ 0,00';
+    }
+
     // Se está dentro da franquia, valor é R$ 0,00
     if (posicao <= franquia) {
       return 'R$ 0,00';
     }
 
-    // Verificar se é uma venda com comissão
-    if (chamado.valorVenda && chamado.comissao) {
-      return `R$ ${chamado.comissao.toFixed(2)} (Comissão 10%)`;
-    }
-
     // Fora da franquia, calcular valor baseado no nível
-    const nivel = (chamado.nivel || '').toLowerCase().trim();
     let valor = 0;
 
     // Detectar o nível e buscar o valor correspondente
@@ -158,8 +158,8 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     } else if (nivel.includes('massivo')) {
       // Massivo
       valor = parseFloat(provedor.valorMassivo) || 0;
-    } else if (nivel.includes('pré') || nivel.includes('pre') || nivel.includes('venda')) {
-      // Pré-Venda ou Venda (se não tiver comissão, usa valor padrão)
+    } else if (nivel.includes('pré') || nivel.includes('pre')) {
+      // Pré-Venda
       valor = parseFloat(provedor.valorPreVenda) || 0;
     }
 

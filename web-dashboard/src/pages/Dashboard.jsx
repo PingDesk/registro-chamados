@@ -274,18 +274,18 @@ function Dashboard({ user, onLogout }) {
       const posicao = chamadosDoProvedor.findIndex(c => c.id === chamado.id) + 1;
       const franquia = parseInt(provedor.franquia) || 0;
 
+      // Vendas sempre retornam 0 no cálculo individual (comissão já contabilizada separadamente)
+      const nivel = chamado.nivel?.toLowerCase() || '';
+      if (nivel.includes('venda')) {
+        return 0;
+      }
+
       // Se está dentro da franquia, valor é R$ 0,00
       if (posicao <= franquia) {
         return 0;
       }
 
-      // Verificar se é uma venda com comissão
-      if (chamado.valorVenda && chamado.comissao) {
-        return chamado.comissao;
-      }
-
       // Fora da franquia, calcular valor
-      const nivel = chamado.nivel?.toLowerCase() || '';
       let valor = 0;
       
       if (nivel.includes('nível 1') || nivel.includes('nivel 1')) {
@@ -295,9 +295,6 @@ function Dashboard({ user, onLogout }) {
       } else if (nivel.includes('massivo')) {
         valor = parseFloat(provedor.valorMassivo) || 0;
       } else if (nivel.includes('pré') || nivel.includes('pre')) {
-        valor = parseFloat(provedor.valorPreVenda) || 0;
-      } else if (nivel.includes('venda')) {
-        // Se for venda mas não tiver comissão, usa valor padrão
         valor = parseFloat(provedor.valorPreVenda) || 0;
       }
       
@@ -383,22 +380,14 @@ function Dashboard({ user, onLogout }) {
         'Valor Total': valores.massivo
       });
 
-      // Vendas
+      // Vendas - agora mostra soma das comissões
       const vendasCount = stats.vendas;
-      const vendasValorUnitario = provider.valorPreVenda || 0;
-      const vendasTotal = valores.vendas;
-      const comissao = (vendasTotal * (provider.comissao || 0)) / 100;
+      const vendasTotal = valores.vendas; // Já é a soma das comissões (10%)
       fechamentoData.push({
-        'Item': 'Vendas',
+        'Item': 'Vendas (Comissão 10%)',
         'Quantidade': vendasCount,
-        'Valor Unitário': vendasValorUnitario,
+        'Valor Unitário': vendasCount > 0 ? (vendasTotal / vendasCount).toFixed(2) : 0,
         'Valor Total': vendasTotal
-      });
-      fechamentoData.push({
-        'Item': 'Comissão sobre Vendas',
-        'Quantidade': `${provider.comissao || 0}%`,
-        'Valor Unitário': '',
-        'Valor Total': comissao
       });
 
       // Total do fechamento
@@ -627,10 +616,15 @@ function Dashboard({ user, onLogout }) {
           return nivel.includes('massivo');
         }).length * (provider.valorMassivo || 0),
         preVendas: preVendasCobrados * (provider.valorPreVenda || 0),
-        vendas: providerChamados.filter(c => {
-          const nivel = c.nivel?.toLowerCase() || '';
-          return nivel.includes('venda');
-        }).length * (provider.valorPreVenda || 0)
+        vendas: providerChamados
+          .filter(c => {
+            const nivel = c.nivel?.toLowerCase() || '';
+            return nivel.includes('venda');
+          })
+          .reduce((total, chamado) => {
+            // Se tiver comissão calculada, usa ela; senão, usa 0
+            return total + (chamado.comissao || 0);
+          }, 0)
       };
 
       valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.preVendas + valores.vendas;
