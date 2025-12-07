@@ -279,6 +279,11 @@ function Dashboard({ user, onLogout }) {
         return 0;
       }
 
+      // Verificar se é uma venda com comissão
+      if (chamado.valorVenda && chamado.comissao) {
+        return chamado.comissao;
+      }
+
       // Fora da franquia, calcular valor
       const nivel = chamado.nivel?.toLowerCase() || '';
       let valor = 0;
@@ -292,6 +297,7 @@ function Dashboard({ user, onLogout }) {
       } else if (nivel.includes('pré') || nivel.includes('pre')) {
         valor = parseFloat(provedor.valorPreVenda) || 0;
       } else if (nivel.includes('venda')) {
+        // Se for venda mas não tiver comissão, usa valor padrão
         valor = parseFloat(provedor.valorPreVenda) || 0;
       }
       

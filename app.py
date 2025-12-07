@@ -617,8 +617,18 @@ class ChamadoApp(QWidget):
         docs = niveis_ref.stream()
         niveis = [doc.get('nivel') for doc in docs]
         self.nivel.addItems(niveis)
+        self.nivel.currentTextChanged.connect(self.nivel_mudou)
         layout.addWidget(QLabel("Nível de Atendimento"))
         layout.addWidget(self.nivel)
+
+        # Campo de valor de venda (inicialmente oculto)
+        self.valor_venda_label = QLabel("Valor da Venda (R$)")
+        self.valor_venda = QLineEdit()
+        self.valor_venda.setPlaceholderText("Ex: 150.00")
+        self.valor_venda_label.hide()
+        self.valor_venda.hide()
+        layout.addWidget(self.valor_venda_label)
+        layout.addWidget(self.valor_venda)
 
         self.botao_salvar = QPushButton("Salvar Chamado")
         self.botao_salvar.clicked.connect(self.salvar)
@@ -653,6 +663,16 @@ class ChamadoApp(QWidget):
         data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         self.data_hora_label.setText(f"Data e Hora: {data_hora}")
 
+    def nivel_mudou(self, texto):
+        """Mostra/oculta campo de valor quando selecionar Venda"""
+        if 'venda' in texto.lower():
+            self.valor_venda_label.show()
+            self.valor_venda.show()
+        else:
+            self.valor_venda_label.hide()
+            self.valor_venda.hide()
+            self.valor_venda.clear()
+
     def sair(self):
         self.timer.stop()
         self.hide()
@@ -671,11 +691,27 @@ class ChamadoApp(QWidget):
         whatsapp = self.whatsapp.text()
         descricao = self.descricao.toPlainText()
         nivel = self.nivel.currentText()
-        data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         if not nome or not protocolo or not whatsapp or not descricao:
             QMessageBox.warning(self, "Erro", "Todos os campos são obrigatórios")
             return
+
+        # Validação para Venda - verifica se valor foi preenchido
+        valor_venda_num = None
+        comissao = None
+        if 'venda' in nivel.lower():
+            valor_venda_text = self.valor_venda.text().strip()
+            if not valor_venda_text:
+                QMessageBox.warning(self, "Erro", "Para vendas, o valor deve ser preenchido")
+                return
+            try:
+                valor_venda_num = float(valor_venda_text.replace(',', '.'))
+                # Calcula 10% de comissão
+                comissao = valor_venda_num * 0.10
+            except ValueError:
+                QMessageBox.warning(self, "Erro", "Valor inválido. Use apenas números (ex: 150.00)")
+                return
 
         # Busca IDs no Firestore
         provedor_id = None
@@ -692,17 +728,34 @@ class ChamadoApp(QWidget):
             nivel_id = doc.id
             break
 
-        # Insere chamado no Firestore
-        db.collection('chamados').add({
+        print(f"[DEBUG] Salvando chamado:")
+        print(f"  - Usuario ID: {self.usuario_id}")
+        print(f"  - Provedor: {provedor} -> ID: {provedor_id}")
+        print(f"  - Nivel: {nivel} -> ID: {nivel_id}")
+        print(f"  - Data/Hora: {data_hora}")
+        if valor_venda_num:
+            print(f"  - Valor Venda: R$ {valor_venda_num:.2f}")
+            print(f"  - Comissão (10%): R$ {comissao:.2f}")
+
+        # Prepara dados do chamado
+        chamado_data = {
             'usuario': self.usuario_id,
-            'provedor': provedor_id,
+            'provedor': provedor_id if provedor_id else provedor,
             'cliente': nome,
             'protocolo': protocolo,
             'numero': whatsapp,
             'descricao': descricao,
             'dataHora': data_hora,
-            'nivel': nivel_id
-        })
+            'nivel': nivel_id if nivel_id else nivel
+        }
+        
+        # Adiciona valor de venda e comissão se for venda
+        if valor_venda_num is not None:
+            chamado_data['valorVenda'] = valor_venda_num
+            chamado_data['comissao'] = comissao
+
+        # Insere chamado no Firestore
+        db.collection('chamados').add(chamado_data)
         
         # Envia mensagem para Telegram
         mensagem = (
@@ -713,8 +766,15 @@ class ChamadoApp(QWidget):
             f"<b>Protocolo:</b> {protocolo}\n"
             f"<b>WhatsApp:</b> {whatsapp}\n"
             f"<b>Nível:</b> {nivel}\n"
-            f"<b>Descrição:</b> {descricao}"
         )
+        
+        # Adiciona informações de venda na mensagem do Telegram
+        if valor_venda_num is not None:
+            mensagem += f"<b>Valor da Venda:</b> R$ {valor_venda_num:.2f}\n"
+            mensagem += f"<b>Comissão (10%):</b> R$ {comissao:.2f}\n"
+        
+        mensagem += f"<b>Descrição:</b> {descricao}"
+        
         enviar_telegram(mensagem)
         
         QMessageBox.information(self, "Sucesso", "Chamado salvo com sucesso")
@@ -722,6 +782,7 @@ class ChamadoApp(QWidget):
         self.protocolo.clear()
         self.whatsapp.clear()
         self.descricao.clear()
+        self.valor_venda.clear()
 
 app = QApplication(sys.argv)
 login = Login()
