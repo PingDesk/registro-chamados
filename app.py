@@ -95,14 +95,18 @@ class LoginThread(QThread):
         self.senha = senha
     
     def run(self):
+        import warnings
+        warnings.filterwarnings('ignore', message='Detected filter using positional arguments')
+        
         try:
             print(f"[DEBUG] Iniciando login para usuário: {self.nome}")
             usuarios_ref = db.collection('usuarios')
             print("[DEBUG] Fazendo query no Firestore...")
             
-            # Query simples sem FieldFilter primeiro
+            # Usar get() ao invés de stream() - mais rápido
             query = usuarios_ref.where('nome', '==', self.nome).where('senha', '==', self.senha).limit(1)
-            docs = list(query.stream())
+            print("[DEBUG] Executando get()...")
+            docs = query.get()
             
             print(f"[DEBUG] Query retornou {len(docs)} documentos")
             
