@@ -80,28 +80,34 @@ class Login(QWidget):
         nome = self.usuario.text()
         senha = self.senha.text()
         
-        # Busca no Firestore
-        usuarios_ref = db.collection('usuarios')
-        docs = usuarios_ref.where('nome', '==', nome).where('senha', '==', senha).stream()
-        usuario_id = None
-        usuario_tipo = None
-        for doc in docs:
-            usuario_id = doc.id
-            usuario_data = doc.to_dict()
-            usuario_tipo = usuario_data.get('tipo', 'Colaborador')
-            break
+        if not nome or not senha:
+            QMessageBox.warning(self, "Erro", "Preencha usuário e senha")
+            return
         
-        if usuario_id:
-            # Bloquear Provedores de acessar o aplicativo
-            if usuario_tipo == 'Provedor':
-                QMessageBox.warning(self, "Acesso Negado", "Provedores têm acesso apenas ao site web")
-                return
+        try:
+            # Busca no Firestore com timeout
+            usuarios_ref = db.collection('usuarios')
+            docs = list(usuarios_ref.where('nome', '==', nome).where('senha', '==', senha).limit(1).stream())
             
-            self.hide()
-            self.app_chamado = ChamadoApp(usuario_id)
-            self.app_chamado.show()
-        else:
-            QMessageBox.warning(self, "Erro", "Usuário ou senha inválidos")
+            if docs:
+                doc = docs[0]
+                usuario_id = doc.id
+                usuario_data = doc.to_dict()
+                usuario_tipo = usuario_data.get('tipo', 'Colaborador')
+                
+                # Bloquear Provedores de acessar o aplicativo
+                if usuario_tipo == 'Provedor':
+                    QMessageBox.warning(self, "Acesso Negado", "Provedores têm acesso apenas ao site web")
+                    return
+                
+                self.hide()
+                self.app_chamado = ChamadoApp(usuario_id)
+                self.app_chamado.show()
+            else:
+                QMessageBox.warning(self, "Erro", "Usuário ou senha inválidos")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro de Conexão", 
+                f"Erro ao conectar ao Firebase.\nVerifique sua conexão com a internet.\n\nDetalhes: {str(e)}")
 
 class AdminUsuarios(QWidget):
     def __init__(self, usuario_id):
@@ -565,10 +571,14 @@ class ChamadoApp(QWidget):
         self.timer.start(1000)  # 1000 ms = 1 segundo
 
         self.provedor = QComboBox()
-        provedores_ref = db.collection('provedores')
-        docs = provedores_ref.stream()
-        provedores = [doc.get('nome') for doc in docs]
-        self.provedor.addItems(provedores)
+        try:
+            provedores_ref = db.collection('provedores')
+            docs = list(provedores_ref.stream())
+            provedores = [doc.get('nome') for doc in docs]
+            self.provedor.addItems(provedores)
+        except Exception as e:
+            print(f"Erro ao carregar provedores: {e}")
+            self.provedor.addItem("Erro ao carregar")
         layout.addWidget(QLabel("Provedor"))
         layout.addWidget(self.provedor)
 
@@ -589,10 +599,14 @@ class ChamadoApp(QWidget):
         layout.addWidget(self.descricao)
 
         self.nivel = QComboBox()
-        niveis_ref = db.collection('niveis')
-        docs = niveis_ref.stream()
-        niveis = [doc.get('nivel') for doc in docs]
-        self.nivel.addItems(niveis)
+        try:
+            niveis_ref = db.collection('niveis')
+            docs = list(niveis_ref.stream())
+            niveis = [doc.get('nivel') for doc in docs]
+            self.nivel.addItems(niveis)
+        except Exception as e:
+            print(f"Erro ao carregar níveis: {e}")
+            self.nivel.addItem("Erro ao carregar")
         self.nivel.currentTextChanged.connect(self.nivel_mudou)
         layout.addWidget(QLabel("Nível de Atendimento"))
         layout.addWidget(self.nivel)
@@ -611,12 +625,15 @@ class ChamadoApp(QWidget):
         layout.addWidget(self.botao_salvar)
 
         # Verifica se é admin e adiciona botão de administração
-        usuarios_ref = db.collection('usuarios')
-        doc = usuarios_ref.document(usuario_id).get()
-        if doc.exists and doc.get('nome') == 'admin':
-            self.botao_admin = QPushButton("Gerenciar Usuários")
-            self.botao_admin.clicked.connect(self.abrir_admin)
-            layout.addWidget(self.botao_admin)
+        try:
+            usuarios_ref = db.collection('usuarios')
+            doc = usuarios_ref.document(usuario_id).get()
+            if doc.exists and doc.get('nome') == 'admin':
+                self.botao_admin = QPushButton("Gerenciar Usuários")
+                self.botao_admin.clicked.connect(self.abrir_admin)
+                layout.addWidget(self.botao_admin)
+        except Exception as e:
+            print(f"Erro ao verificar admin: {e}")
 
         self.botao_sair = QPushButton("Sair")
         self.botao_sair.clicked.connect(self.sair)
