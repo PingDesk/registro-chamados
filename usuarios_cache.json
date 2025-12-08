@@ -1,0 +1,10 @@
+[
+  {
+    "id": "admin_user_id",
+    "data": {
+      "nome": "admin",
+      "senha": "admin",
+      "tipo": "Administrador"
+    }
+  }
+]

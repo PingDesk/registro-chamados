@@ -55,6 +55,34 @@ cred = credentials.Certificate(resource_path('firebase-key.json'))
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+# Cache local para quando Firebase exceder quota
+CACHE_FILE = 'usuarios_cache.json'
+
+def salvar_cache_usuarios(usuarios_data):
+    """Salva cache dos usuários em arquivo local"""
+    import json
+    try:
+        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(usuarios_data, f, ensure_ascii=False, indent=2)
+        print("[DEBUG] Cache de usuários salvo")
+    except Exception as e:
+        print(f"[DEBUG] Erro ao salvar cache: {e}")
+
+def carregar_cache_usuarios():
+    """Carrega cache dos usuários do arquivo local"""
+    import json
+    try:
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        print(f"[DEBUG] Cache carregado: {len(data)} usuários")
+        return data
+    except FileNotFoundError:
+        print("[DEBUG] Arquivo de cache não encontrado")
+        return None
+    except Exception as e:
+        print(f"[DEBUG] Erro ao carregar cache: {e}")
+        return None
+
 # Função removida - coleções já existem no Firebase
 # As verificações consumiam muita quota do Firebase
 
@@ -96,38 +124,95 @@ class LoginThread(QThread):
     
     def run(self):
         import warnings
+        import threading
+        import sys
         warnings.filterwarnings('ignore', message='Detected filter using positional arguments')
         
-        try:
-            print(f"[DEBUG] Iniciando login para usuário: {self.nome}")
-            usuarios_ref = db.collection('usuarios')
-            print("[DEBUG] Buscando todos os usuários (evita composite query)...")
+        resultado = {'usuarios': None, 'erro': None, 'erro_detalhado': None, 'concluido': False}
+        
+        def buscar_usuarios():
+            try:
+                print(f"[DEBUG] Iniciando login para: {self.nome}")
+                usuarios_ref = db.collection('usuarios')
+                print("[DEBUG] Buscando usuários no Firebase...")
+                print(f"[DEBUG] Python version: {sys.version}")
+                all_docs = usuarios_ref.get()
+                print(f"[DEBUG] Retornou {len(all_docs)} usuários")
+                
+                # Salva cache para uso futuro
+                usuarios_data = [{'id': doc.id, 'data': doc.to_dict()} for doc in all_docs]
+                salvar_cache_usuarios(usuarios_data)
+                
+                resultado['usuarios'] = all_docs
+                resultado['concluido'] = True
+            except Exception as e:
+                print(f"[DEBUG] ERRO CAPTURADO: {type(e).__name__}: {str(e)}")
+                import traceback
+                erro_completo = traceback.format_exc()
+                print(f"[DEBUG] Stack trace completo:\n{erro_completo}")
+                resultado['erro'] = str(e)
+                resultado['erro_detalhado'] = erro_completo
+                resultado['concluido'] = True
+        
+        # Executa em thread com timeout
+        print("[DEBUG] Criando thread...")
+        thread = threading.Thread(target=buscar_usuarios, daemon=True)
+        thread.start()
+        print("[DEBUG] Aguardando resposta (timeout 15s)...")
+        thread.join(timeout=15)
+        
+        if not resultado['concluido']:
+            print("[DEBUG] TIMEOUT - Firebase não respondeu em 15 segundos")
+            print("[DEBUG] Tentando usar cache local...")
             
-            # Busca TODOS os usuários e filtra localmente
-            all_docs = usuarios_ref.get()
-            print(f"[DEBUG] Total de usuários: {len(all_docs)}")
+            cache_data = carregar_cache_usuarios()
+            if cache_data:
+                print(f"[DEBUG] ✅ Cache encontrado com {len(cache_data)} usuários")
+                # Filtra localmente usando cache
+                usuario_encontrado = None
+                for user_info in cache_data:
+                    data = user_info['data']
+                    if data.get('nome') == self.nome and data.get('senha') == self.senha:
+                        usuario_id = user_info['id']
+                        usuario_tipo = data.get('tipo', 'Colaborador')
+                        print(f"[DEBUG] Login OK via CACHE! ID: {usuario_id}, Tipo: {usuario_tipo}")
+                        self.login_sucesso.emit(usuario_id, usuario_tipo)
+                        return
+                
+                print("[DEBUG] Usuário não encontrado no cache")
+                self.login_falhou.emit("Usuário ou senha inválidos\n\n(Firebase offline - usando cache local)")
+                return
             
-            # Filtra localmente
-            usuario_encontrado = None
-            for doc in all_docs:
-                data = doc.to_dict()
-                if data.get('nome') == self.nome and data.get('senha') == self.senha:
-                    usuario_encontrado = doc
-                    break
-            
-            if usuario_encontrado:
-                usuario_id = usuario_encontrado.id
-                usuario_data = usuario_encontrado.to_dict()
-                usuario_tipo = usuario_data.get('tipo', 'Colaborador')
-                print(f"[DEBUG] Login OK! ID: {usuario_id}, Tipo: {usuario_tipo}")
-                self.login_sucesso.emit(usuario_id, usuario_tipo)
-            else:
-                print("[DEBUG] Credenciais inválidas")
-                self.login_falhou.emit("Usuário ou senha inválidos")
-        except Exception as e:
-            print(f"[DEBUG] Erro: {str(e)}")
-            import traceback
-            traceback.print_exc()
+            print("[DEBUG] ❌ Cache não disponível")
+            self.login_falhou.emit("Timeout: Firebase não está respondendo.\n\n⚠️ QUOTA EXCEDIDA\nO Firebase atingiu o limite gratuito.\n\nSoluções:\n1. Aguardar 24h\n2. Upgrade para plano pago")
+            return
+        
+        if resultado['erro']:
+            print(f"[DEBUG] Erro encontrado: {resultado['erro']}")
+            msg_erro = f"Erro ao conectar ao Firebase.\n\n{resultado['erro']}"
+            if "429" in resultado['erro'] or "quota" in resultado['erro'].lower():
+                msg_erro = "❌ QUOTA DO FIREBASE EXCEDIDA!\n\nO Firebase atingiu o limite gratuito.\nAguarde 24h ou faça upgrade do plano."
+            self.login_falhou.emit(msg_erro)
+            return
+        
+        # Filtra localmente
+        print("[DEBUG] Filtrando usuários localmente...")
+        usuario_encontrado = None
+        for doc in resultado['usuarios']:
+            data = doc.to_dict()
+            if data.get('nome') == self.nome and data.get('senha') == self.senha:
+                usuario_encontrado = doc
+                break
+        
+        if usuario_encontrado:
+            usuario_id = usuario_encontrado.id
+            usuario_data = usuario_encontrado.to_dict()
+            usuario_tipo = usuario_data.get('tipo', 'Colaborador')
+            print(f"[DEBUG] Login OK! ID: {usuario_id}, Tipo: {usuario_tipo}")
+            self.login_sucesso.emit(usuario_id, usuario_tipo)
+        else:
+            print("[DEBUG] Credenciais inválidas")
+            self.login_falhou.emit("Usuário ou senha inválidos")
             self.login_falhou.emit(f"Erro ao conectar ao Firebase.\n\nDetalhes: {str(e)}")
         
         docs = resultado['docs']
