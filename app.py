@@ -55,32 +55,8 @@ cred = credentials.Certificate(resource_path('firebase-key.json'))
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Cria coleções padrão se não existirem
-def init_firebase():
-    # Verifica e cria usuário padrão
-    usuarios_ref = db.collection('usuarios')
-    docs = usuarios_ref.where('nome', '==', 'admin').stream()
-    if not any(docs):
-        usuarios_ref.add({
-            'nome': 'admin',
-            'senha': '1234'
-        })
-    
-    # Verifica e cria provedores padrão
-    provedores_ref = db.collection('provedores')
-    docs = provedores_ref.stream()
-    if not any(docs):
-        provedores_ref.add({'nome': 'Provedor1'})
-        provedores_ref.add({'nome': 'Provedor2'})
-    
-    # Verifica e cria níveis padrão
-    niveis_ref = db.collection('niveis')
-    docs = niveis_ref.stream()
-    if not any(docs):
-        niveis_ref.add({'nivel': 'Nível 1'})
-        niveis_ref.add({'nivel': 'Nível 2'})
-
-init_firebase()
+# Função removida - coleções já existem no Firebase
+# As verificações consumiam muita quota do Firebase
 
 class Login(QWidget):
     def __init__(self):
