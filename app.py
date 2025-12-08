@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 import requests
 
 # Função para obter o caminho correto dos arquivos (funciona tanto em dev quanto em .exe)
@@ -84,6 +85,32 @@ class FirebaseLoaderThread(QThread):
         except Exception as e:
             self.erro.emit(str(e), self.tipo)
 
+# Thread para autenticação
+class LoginThread(QThread):
+    login_sucesso = pyqtSignal(str, str)  # usuario_id, tipo
+    login_falhou = pyqtSignal(str)  # mensagem de erro
+    
+    def __init__(self, nome, senha):
+        super().__init__()
+        self.nome = nome
+        self.senha = senha
+    
+    def run(self):
+        try:
+            usuarios_ref = db.collection('usuarios')
+            docs = list(usuarios_ref.where(filter=FieldFilter('nome', '==', self.nome)).where(filter=FieldFilter('senha', '==', self.senha)).limit(1).stream())
+            
+            if docs:
+                doc = docs[0]
+                usuario_id = doc.id
+                usuario_data = doc.to_dict()
+                usuario_tipo = usuario_data.get('tipo', 'Colaborador')
+                self.login_sucesso.emit(usuario_id, usuario_tipo)
+            else:
+                self.login_falhou.emit("Usuário ou senha inválidos")
+        except Exception as e:
+            self.login_falhou.emit(f"Erro ao conectar ao Firebase.\n\nDetalhes: {str(e)}")
+
 class Login(QWidget):
     def __init__(self):
         super().__init__()
@@ -101,6 +128,7 @@ class Login(QWidget):
         self.botao.clicked.connect(self.checar_login)
         layout.addWidget(self.botao)
         self.setLayout(layout)
+        self.login_thread = None
 
     def checar_login(self):
         nome = self.usuario.text()
@@ -110,30 +138,38 @@ class Login(QWidget):
             QMessageBox.warning(self, "Erro", "Preencha usuário e senha")
             return
         
-        try:
-            # Busca no Firestore com timeout
-            usuarios_ref = db.collection('usuarios')
-            docs = list(usuarios_ref.where('nome', '==', nome).where('senha', '==', senha).limit(1).stream())
-            
-            if docs:
-                doc = docs[0]
-                usuario_id = doc.id
-                usuario_data = doc.to_dict()
-                usuario_tipo = usuario_data.get('tipo', 'Colaborador')
-                
-                # Bloquear Provedores de acessar o aplicativo
-                if usuario_tipo == 'Provedor':
-                    QMessageBox.warning(self, "Acesso Negado", "Provedores têm acesso apenas ao site web")
-                    return
-                
-                self.hide()
-                self.app_chamado = ChamadoApp(usuario_id)
-                self.app_chamado.show()
-            else:
-                QMessageBox.warning(self, "Erro", "Usuário ou senha inválidos")
-        except Exception as e:
-            QMessageBox.critical(self, "Erro de Conexão", 
-                f"Erro ao conectar ao Firebase.\nVerifique sua conexão com a internet.\n\nDetalhes: {str(e)}")
+        # Desabilita botão durante autenticação
+        self.botao.setEnabled(False)
+        self.botao.setText("Autenticando...")
+        
+        # Inicia thread de login
+        self.login_thread = LoginThread(nome, senha)
+        self.login_thread.login_sucesso.connect(self.on_login_sucesso)
+        self.login_thread.login_falhou.connect(self.on_login_falhou)
+        self.login_thread.start()
+    
+    def on_login_sucesso(self, usuario_id, usuario_tipo):
+        """Callback quando login é bem sucedido"""
+        # Bloquear Provedores de acessar o aplicativo
+        if usuario_tipo == 'Provedor':
+            QMessageBox.warning(self, "Acesso Negado", "Provedores têm acesso apenas ao site web")
+            self.botao.setEnabled(True)
+            self.botao.setText("Login")
+            return
+        
+        self.hide()
+        self.app_chamado = ChamadoApp(usuario_id)
+        self.app_chamado.show()
+    
+    def on_login_falhou(self, mensagem):
+        """Callback quando login falha"""
+        if "Erro ao conectar" in mensagem:
+            QMessageBox.critical(self, "Erro de Conexão", mensagem)
+        else:
+            QMessageBox.warning(self, "Erro", mensagem)
+        
+        self.botao.setEnabled(True)
+        self.botao.setText("Login")
 
 class AdminUsuarios(QWidget):
     def __init__(self, usuario_id):
