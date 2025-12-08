@@ -96,35 +96,54 @@ class LoginThread(QThread):
     
     def run(self):
         import warnings
+        import threading
         warnings.filterwarnings('ignore', message='Detected filter using positional arguments')
         
-        try:
-            print(f"[DEBUG] Iniciando login para usuário: {self.nome}")
-            usuarios_ref = db.collection('usuarios')
-            print("[DEBUG] Fazendo query no Firestore...")
-            
-            # Usar get() ao invés de stream() - mais rápido
-            query = usuarios_ref.where('nome', '==', self.nome).where('senha', '==', self.senha).limit(1)
-            print("[DEBUG] Executando get()...")
-            docs = query.get()
-            
-            print(f"[DEBUG] Query retornou {len(docs)} documentos")
-            
-            if docs:
-                doc = docs[0]
-                usuario_id = doc.id
-                usuario_data = doc.to_dict()
-                usuario_tipo = usuario_data.get('tipo', 'Colaborador')
-                print(f"[DEBUG] Login bem sucedido! ID: {usuario_id}, Tipo: {usuario_tipo}")
-                self.login_sucesso.emit(usuario_id, usuario_tipo)
-            else:
-                print("[DEBUG] Nenhum usuário encontrado")
-                self.login_falhou.emit("Usuário ou senha inválidos")
-        except Exception as e:
-            print(f"[DEBUG] Erro no login: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            self.login_falhou.emit(f"Erro ao conectar ao Firebase.\n\nDetalhes: {str(e)}")
+        resultado = {'docs': None, 'erro': None, 'concluido': False}
+        
+        def fazer_query():
+            try:
+                print(f"[DEBUG] Iniciando login para usuário: {self.nome}")
+                usuarios_ref = db.collection('usuarios')
+                print("[DEBUG] Fazendo query no Firestore...")
+                
+                query = usuarios_ref.where('nome', '==', self.nome).where('senha', '==', self.senha).limit(1)
+                print("[DEBUG] Executando get()...")
+                docs = query.get()
+                print(f"[DEBUG] Query retornou {len(docs)} documentos")
+                resultado['docs'] = docs
+                resultado['concluido'] = True
+            except Exception as e:
+                print(f"[DEBUG] Erro na query: {str(e)}")
+                resultado['erro'] = e
+                resultado['concluido'] = True
+        
+        # Executa query em thread separada com timeout
+        thread_query = threading.Thread(target=fazer_query, daemon=True)
+        thread_query.start()
+        thread_query.join(timeout=10)  # Timeout de 10 segundos
+        
+        if not resultado['concluido']:
+            print("[DEBUG] Timeout - Firebase não respondeu em 10 segundos")
+            self.login_falhou.emit("Timeout: Firebase demorou muito para responder.\nVerifique sua conexão com a internet.")
+            return
+        
+        if resultado['erro']:
+            print(f"[DEBUG] Erro no login: {str(resultado['erro'])}")
+            self.login_falhou.emit(f"Erro ao conectar ao Firebase.\n\nDetalhes: {str(resultado['erro'])}")
+            return
+        
+        docs = resultado['docs']
+        if docs:
+            doc = docs[0]
+            usuario_id = doc.id
+            usuario_data = doc.to_dict()
+            usuario_tipo = usuario_data.get('tipo', 'Colaborador')
+            print(f"[DEBUG] Login bem sucedido! ID: {usuario_id}, Tipo: {usuario_tipo}")
+            self.login_sucesso.emit(usuario_id, usuario_tipo)
+        else:
+            print("[DEBUG] Nenhum usuário encontrado")
+            self.login_falhou.emit("Usuário ou senha inválidos")
 
 class Login(QWidget):
     def __init__(self):
