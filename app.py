@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QTextEdit, QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QHBoxLayout, QInputDialog
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QThread, pyqtSignal
 import sys
 import os
 from datetime import datetime
@@ -57,6 +57,32 @@ db = firestore.client()
 
 # Função removida - coleções já existem no Firebase
 # As verificações consumiam muita quota do Firebase
+
+# Thread para carregar dados do Firebase em background
+class FirebaseLoaderThread(QThread):
+    dados_carregados = pyqtSignal(list, str)  # lista de dados, tipo (provedores/niveis)
+    erro = pyqtSignal(str, str)  # mensagem de erro, tipo
+    
+    def __init__(self, collection_name, tipo):
+        super().__init__()
+        self.collection_name = collection_name
+        self.tipo = tipo
+    
+    def run(self):
+        try:
+            ref = db.collection(self.collection_name)
+            docs = list(ref.stream())
+            
+            if self.tipo == 'provedores':
+                dados = [doc.get('nome') for doc in docs]
+            elif self.tipo == 'niveis':
+                dados = [doc.get('nivel') for doc in docs]
+            else:
+                dados = []
+            
+            self.dados_carregados.emit(dados, self.tipo)
+        except Exception as e:
+            self.erro.emit(str(e), self.tipo)
 
 class Login(QWidget):
     def __init__(self):
@@ -284,23 +310,31 @@ class AdminUsuarios(QWidget):
     
     def carregar_usuarios(self):
         self.lista_usuarios.clear()
-        usuarios_ref = db.collection('usuarios')
-        docs = usuarios_ref.stream()
-        for doc in docs:
-            nome = doc.get('nome')
-            item = QListWidgetItem(nome)
-            item.setData(1, doc.id)
-            self.lista_usuarios.addItem(item)
+        try:
+            usuarios_ref = db.collection('usuarios')
+            docs = list(usuarios_ref.stream())
+            for doc in docs:
+                nome = doc.get('nome')
+                item = QListWidgetItem(nome)
+                item.setData(1, doc.id)
+                self.lista_usuarios.addItem(item)
+        except Exception as e:
+            print(f"Erro ao carregar usuários: {e}")
+            self.lista_usuarios.addItem("Erro ao carregar")
     
     def carregar_provedores(self):
         self.lista_provedores.clear()
-        provedores_ref = db.collection('provedores')
-        docs = provedores_ref.stream()
-        for doc in docs:
-            nome = doc.get('nome')
-            item = QListWidgetItem(nome)
-            item.setData(1, doc.id)
-            self.lista_provedores.addItem(item)
+        try:
+            provedores_ref = db.collection('provedores')
+            docs = list(provedores_ref.stream())
+            for doc in docs:
+                nome = doc.get('nome')
+                item = QListWidgetItem(nome)
+                item.setData(1, doc.id)
+                self.lista_provedores.addItem(item)
+        except Exception as e:
+            print(f"Erro ao carregar provedores: {e}")
+            self.lista_provedores.addItem("Erro ao carregar")
     
     def atualizar_aba_atual(self):
         """Atualiza a lista da aba atual"""
@@ -316,24 +350,18 @@ class AdminUsuarios(QWidget):
             print(f"Erro ao atualizar aba: {e}")
     
     def carregar_niveis(self):
-        """Atualiza a lista da aba atual"""
-        current_index = self.tabs.currentIndex()
-        if current_index == 0:  # Aba Usuários
-            self.carregar_usuarios()
-        elif current_index == 1:  # Aba Provedores
-            self.carregar_provedores()
-        elif current_index == 2:  # Aba Níveis
-            self.carregar_niveis()
-    
-    def carregar_niveis(self):
         self.lista_niveis.clear()
-        niveis_ref = db.collection('niveis')
-        docs = niveis_ref.stream()
-        for doc in docs:
-            nivel = doc.get('nivel')
-            item = QListWidgetItem(nivel)
-            item.setData(1, doc.id)
-            self.lista_niveis.addItem(item)
+        try:
+            niveis_ref = db.collection('niveis')
+            docs = list(niveis_ref.stream())
+            for doc in docs:
+                nivel = doc.get('nivel')
+                item = QListWidgetItem(nivel)
+                item.setData(1, doc.id)
+                self.lista_niveis.addItem(item)
+        except Exception as e:
+            print(f"Erro ao carregar níveis: {e}")
+            self.lista_niveis.addItem("Erro ao carregar")
     
     def editar_usuario(self):
         item = self.lista_usuarios.currentItem()
@@ -571,14 +599,7 @@ class ChamadoApp(QWidget):
         self.timer.start(1000)  # 1000 ms = 1 segundo
 
         self.provedor = QComboBox()
-        try:
-            provedores_ref = db.collection('provedores')
-            docs = list(provedores_ref.stream())
-            provedores = [doc.get('nome') for doc in docs]
-            self.provedor.addItems(provedores)
-        except Exception as e:
-            print(f"Erro ao carregar provedores: {e}")
-            self.provedor.addItem("Erro ao carregar")
+        self.provedor.addItem("Carregando...")
         layout.addWidget(QLabel("Provedor"))
         layout.addWidget(self.provedor)
 
@@ -599,14 +620,7 @@ class ChamadoApp(QWidget):
         layout.addWidget(self.descricao)
 
         self.nivel = QComboBox()
-        try:
-            niveis_ref = db.collection('niveis')
-            docs = list(niveis_ref.stream())
-            niveis = [doc.get('nivel') for doc in docs]
-            self.nivel.addItems(niveis)
-        except Exception as e:
-            print(f"Erro ao carregar níveis: {e}")
-            self.nivel.addItem("Erro ao carregar")
+        self.nivel.addItem("Carregando...")
         self.nivel.currentTextChanged.connect(self.nivel_mudou)
         layout.addWidget(QLabel("Nível de Atendimento"))
         layout.addWidget(self.nivel)
@@ -627,7 +641,7 @@ class ChamadoApp(QWidget):
         # Verifica se é admin e adiciona botão de administração
         try:
             usuarios_ref = db.collection('usuarios')
-            doc = usuarios_ref.document(usuario_id).get()
+            doc = usuarios_ref.document(usuario_id).get(timeout=5)
             if doc.exists and doc.get('nome') == 'admin':
                 self.botao_admin = QPushButton("Gerenciar Usuários")
                 self.botao_admin.clicked.connect(self.abrir_admin)
@@ -640,17 +654,56 @@ class ChamadoApp(QWidget):
         layout.addWidget(self.botao_sair)
 
         self.setLayout(layout)
+        
+        # Carrega provedores e níveis em background
+        self.carregar_dados_background()
+    
+    def carregar_dados_background(self):
+        """Carrega provedores e níveis usando threads"""
+        # Thread para provedores
+        self.thread_provedores = FirebaseLoaderThread('provedores', 'provedores')
+        self.thread_provedores.dados_carregados.connect(self.on_dados_carregados)
+        self.thread_provedores.erro.connect(self.on_erro_carregamento)
+        self.thread_provedores.start()
+        
+        # Thread para níveis
+        self.thread_niveis = FirebaseLoaderThread('niveis', 'niveis')
+        self.thread_niveis.dados_carregados.connect(self.on_dados_carregados)
+        self.thread_niveis.erro.connect(self.on_erro_carregamento)
+        self.thread_niveis.start()
+    
+    def on_dados_carregados(self, dados, tipo):
+        """Callback quando dados são carregados com sucesso"""
+        if tipo == 'provedores':
+            self.provedor.clear()
+            self.provedor.addItems(dados)
+        elif tipo == 'niveis':
+            self.nivel.clear()
+            self.nivel.addItems(dados)
+    
+    def on_erro_carregamento(self, erro, tipo):
+        """Callback quando ocorre erro ao carregar"""
+        print(f"Erro ao carregar {tipo}: {erro}")
+        if tipo == 'provedores':
+            self.provedor.clear()
+            self.provedor.addItem("Erro ao carregar")
+        elif tipo == 'niveis':
+            self.nivel.clear()
+            self.nivel.addItem("Erro ao carregar")
 
     def abrir_admin(self):
         # Verifica se o usuário logado é admin
-        usuarios_ref = db.collection('usuarios')
-        doc = usuarios_ref.document(self.usuario_id).get()
-        
-        if doc.exists and doc.get('nome') == 'admin':
-            self.admin_window = AdminUsuarios(self.usuario_id)
-            self.admin_window.show()
-        else:
-            QMessageBox.warning(self, "Acesso Negado", "Apenas o usuário admin pode acessar esta funcionalidade")
+        try:
+            usuarios_ref = db.collection('usuarios')
+            doc = usuarios_ref.document(self.usuario_id).get(timeout=5)
+            
+            if doc.exists and doc.get('nome') == 'admin':
+                self.admin_window = AdminUsuarios(self.usuario_id)
+                self.admin_window.show()
+            else:
+                QMessageBox.warning(self, "Acesso Negado", "Apenas o usuário admin pode acessar esta funcionalidade")
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Erro ao verificar permissões: {str(e)}")
 
     def atualizar_data_hora(self):
         data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
