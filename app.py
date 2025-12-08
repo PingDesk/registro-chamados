@@ -700,6 +700,8 @@ class ChamadoApp(QWidget):
         # Validação para Venda - verifica se valor foi preenchido
         valor_venda_num = None
         comissao = None
+        percentual_comissao = 10  # Padrão 10%
+        
         if 'venda' in nivel.lower():
             valor_venda_text = self.valor_venda.text().strip()
             if not valor_venda_text:
@@ -710,7 +712,6 @@ class ChamadoApp(QWidget):
                 
                 # Busca porcentagem de comissão do provedor
                 provedor_nome = self.provedor.currentText()
-                percentual_comissao = 10  # Padrão 10%
                 provedores_ref = db.collection('provedores')
                 docs = provedores_ref.where('nome', '==', provedor_nome).stream()
                 for doc in docs:
