@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
 import requests
 
 # Função para obter o caminho correto dos arquivos (funciona tanto em dev quanto em .exe)
@@ -97,18 +96,30 @@ class LoginThread(QThread):
     
     def run(self):
         try:
+            print(f"[DEBUG] Iniciando login para usuário: {self.nome}")
             usuarios_ref = db.collection('usuarios')
-            docs = list(usuarios_ref.where(filter=FieldFilter('nome', '==', self.nome)).where(filter=FieldFilter('senha', '==', self.senha)).limit(1).stream())
+            print("[DEBUG] Fazendo query no Firestore...")
+            
+            # Query simples sem FieldFilter primeiro
+            query = usuarios_ref.where('nome', '==', self.nome).where('senha', '==', self.senha).limit(1)
+            docs = list(query.stream())
+            
+            print(f"[DEBUG] Query retornou {len(docs)} documentos")
             
             if docs:
                 doc = docs[0]
                 usuario_id = doc.id
                 usuario_data = doc.to_dict()
                 usuario_tipo = usuario_data.get('tipo', 'Colaborador')
+                print(f"[DEBUG] Login bem sucedido! ID: {usuario_id}, Tipo: {usuario_tipo}")
                 self.login_sucesso.emit(usuario_id, usuario_tipo)
             else:
+                print("[DEBUG] Nenhum usuário encontrado")
                 self.login_falhou.emit("Usuário ou senha inválidos")
         except Exception as e:
+            print(f"[DEBUG] Erro no login: {str(e)}")
+            import traceback
+            traceback.print_exc()
             self.login_falhou.emit(f"Erro ao conectar ao Firebase.\n\nDetalhes: {str(e)}")
 
 class Login(QWidget):
