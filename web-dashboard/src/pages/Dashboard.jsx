@@ -509,30 +509,40 @@ function Dashboard({ user, onLogout }) {
         const anoChamado = parseInt(dataParts[2]);
 
         const hoje = new Date();
+        const diaHoje = hoje.getDate();
         const mesAtual = hoje.getMonth() + 1;
         const anoAtual = hoje.getFullYear();
 
-        const diaInicio = provider.diaInicio;
-        const diaFim = provider.diaFim;
+        const diaInicio = parseInt(provider.diaInicio);
+        const diaFim = parseInt(provider.diaFim);
 
-        // Se o período não cruza o mês (ex: 01/12 a 31/12)
+        // Calcular início e fim do período de fechamento
+        let dataInicio, dataFim;
         if (diaInicio <= diaFim) {
-          // Deve estar no mês atual e dentro do período
-          return mesChamado === mesAtual && 
-                 anoChamado === anoAtual && 
-                 diaChamado >= diaInicio && 
-                 diaChamado <= diaFim;
+          // Período dentro do mesmo mês
+          dataInicio = new Date(anoAtual, mesAtual - 1, diaInicio, 0, 0, 0);
+          dataFim = new Date(anoAtual, mesAtual - 1, diaFim, 23, 59, 59);
         } else {
-          // Período cruza o mês (ex: 28/11 a 28/12)
-          // Pode estar no mês anterior (a partir do dia início) ou mês atual (até o dia fim)
-          const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1;
-          const anoMesAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual;
-
-          return (
-            (mesChamado === mesAnterior && anoChamado === anoMesAnterior && diaChamado >= diaInicio) ||
-            (mesChamado === mesAtual && anoChamado === anoAtual && diaChamado <= diaFim)
-          );
+          // Período cruza o mês
+          if (diaHoje >= diaInicio) {
+            // Estamos na parte inicial do período (após diaInicio até fim do mês)
+            dataInicio = new Date(anoAtual, mesAtual - 1, diaInicio, 0, 0, 0);
+            // Fim é no mês seguinte
+            let mesFim = mesAtual === 12 ? 1 : mesAtual + 1;
+            let anoFim = mesAtual === 12 ? anoAtual + 1 : anoAtual;
+            dataFim = new Date(anoFim, mesFim - 1, diaFim, 23, 59, 59);
+          } else {
+            // Estamos na parte final do período (início do mês até diaFim)
+            let mesInicio = mesAtual === 1 ? 12 : mesAtual - 1;
+            let anoInicio = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+            dataInicio = new Date(anoInicio, mesInicio - 1, diaInicio, 0, 0, 0);
+            dataFim = new Date(anoAtual, mesAtual - 1, diaFim, 23, 59, 59);
+          }
         }
+
+        // Data do chamado
+        const dataChamado = new Date(anoChamado, mesChamado - 1, diaChamado, 12, 0, 0);
+        return dataChamado >= dataInicio && dataChamado <= dataFim;
       } catch (error) {
         console.error('Erro ao verificar período:', error);
         return true;
