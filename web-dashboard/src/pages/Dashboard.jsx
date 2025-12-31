@@ -592,21 +592,39 @@ function Dashboard({ user, onLogout }) {
         return nivel.includes('pré') || nivel.includes('pre');
       }).length;
 
-      // Distribuir chamados fora da franquia proporcionalmente
+      // Distribuir chamados fora da franquia proporcionalmente (sem perder excedentes)
       const totalFranquiaTypes = nivel1Count + nivel2Count + preVendasCount;
       let nivel1Cobrados = 0;
       let nivel2Cobrados = 0;
       let preVendasCobrados = 0;
 
-      if (totalFranquiaTypes > franquia) {
-        // Calcular proporção de cada tipo
-        const propNivel1 = nivel1Count / totalFranquiaTypes;
-        const propNivel2 = nivel2Count / totalFranquiaTypes;
-        const propPreVendas = preVendasCount / totalFranquiaTypes;
+      if (chamadosForaFranquia > 0 && totalFranquiaTypes > 0) {
+        // Distribuição proporcional, mas garantindo que a soma seja igual ao total de excedentes
+        const rawNivel1 = chamadosForaFranquia * (nivel1Count / totalFranquiaTypes);
+        const rawNivel2 = chamadosForaFranquia * (nivel2Count / totalFranquiaTypes);
+        const rawPreVendas = chamadosForaFranquia * (preVendasCount / totalFranquiaTypes);
 
-        nivel1Cobrados = Math.floor(chamadosForaFranquia * propNivel1);
-        nivel2Cobrados = Math.floor(chamadosForaFranquia * propNivel2);
-        preVendasCobrados = Math.floor(chamadosForaFranquia * propPreVendas);
+        // Arredondar para baixo
+        nivel1Cobrados = Math.floor(rawNivel1);
+        nivel2Cobrados = Math.floor(rawNivel2);
+        preVendasCobrados = Math.floor(rawPreVendas);
+
+        // Corrigir diferença para garantir que a soma seja igual ao total de excedentes
+        let distribuido = nivel1Cobrados + nivel2Cobrados + preVendasCobrados;
+        let diff = chamadosForaFranquia - distribuido;
+        // Distribuir o restante para os tipos com maior parte decimal
+        const decimais = [
+          { tipo: 'nivel1', valor: rawNivel1 - nivel1Cobrados },
+          { tipo: 'nivel2', valor: rawNivel2 - nivel2Cobrados },
+          { tipo: 'preVendas', valor: rawPreVendas - preVendasCobrados }
+        ];
+        decimais.sort((a, b) => b.valor - a.valor);
+        for (let i = 0; i < decimais.length && diff > 0; i++) {
+          if (decimais[i].tipo === 'nivel1') nivel1Cobrados++;
+          if (decimais[i].tipo === 'nivel2') nivel2Cobrados++;
+          if (decimais[i].tipo === 'preVendas') preVendasCobrados++;
+          diff--;
+        }
       }
 
       const valores = {
