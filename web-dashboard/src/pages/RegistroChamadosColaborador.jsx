@@ -28,7 +28,7 @@ function RegistroChamadosColaborador({ user, onLogout }) {
       // Enviar para Telegram (dados do app.py)
       const TELEGRAM_TOKEN = '8353262305:AAG_kMgFVLGRQ8EwQjhyEUAkeOWBH-kTYhs';
       const TELEGRAM_CHAT_ID = '-1003349243615';
-      const msg = `Novo chamado registrado:\nProvedor: ${form.provedor}\nCliente: ${form.cliente}\nProtocolo: ${form.protocolo}\nEndereço: ${form.endereco}\nWhatsApp: ${form.whatsapp}\nNível: ${form.nivel}\nDescrição: ${form.descricao}\nUsuário: ${user.nome}\nData/Hora: ${new Date().toLocaleString('pt-BR')}`;
+      const msg = `📞 Novo Chamado Aberto\n\nProvedor: ${form.provedor}\nData/Hora: ${new Date().toLocaleString('pt-BR')}\nNome do Cliente: ${form.cliente}\nEndereço: ${form.endereco}\nProtocolo: ${form.protocolo}\nWhatsApp: ${form.whatsapp}\nDescrição: ${form.descricao}`;
       await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
