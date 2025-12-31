@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ChamadoForm.css';
 
+
 function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis = [] }) {
-  const [form, setForm] = useState({
+  const emptyForm = {
     dataHora: '',
     provedor: '',
     cliente: '',
@@ -11,22 +12,19 @@ function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis
     whatsapp: '',
     nivel: '',
     descricao: '',
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
 
 
   // Atualiza dataHora em tempo real
   useEffect(() => {
-    let intervalId;
-    if (initialData && initialData.dataHora) {
-      setForm(f => ({ ...f, ...initialData }));
-    } else {
-      setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
-    }
-    intervalId = setInterval(() => {
+    setForm(f => ({ ...emptyForm, ...initialData, dataHora: new Date().toLocaleString('pt-BR') }));
+    const intervalId = setInterval(() => {
       setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
     }, 1000);
     return () => clearInterval(intervalId);
-  }, [initialData]);
+    // eslint-disable-next-line
+  }, [JSON.stringify(initialData)]);
 
   const handleChange = e => {
     const { name, value } = e.target;
@@ -37,9 +35,12 @@ function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis
     setForm(f => ({ ...f, nivel: e.target.value }));
   };
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    onSave(form);
+    const result = await onSave(form);
+    if (result !== false) {
+      setForm(f => ({ ...emptyForm, dataHora: new Date().toLocaleString('pt-BR') }));
+    }
   };
 
   return (

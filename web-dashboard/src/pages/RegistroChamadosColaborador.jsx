@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ChamadoForm from '../components/ChamadoForm';
 import useProvedores from '../hooks/useProvedores';
+
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
@@ -22,12 +23,23 @@ function RegistroChamadosColaborador({ user, onLogout }) {
         dataHora: new Date().toLocaleString('pt-BR'),
         criadoEm: serverTimestamp(),
       });
+
+      // Enviar para Telegram
+      const msg = `Novo chamado registrado:%0AProvedor: ${form.provedor}%0ACliente: ${form.cliente}%0AProtocolo: ${form.protocolo}%0AEndereço: ${form.endereco}%0AWhatsApp: ${form.whatsapp}%0ANível: ${form.nivel}%0ADescrição: ${form.descricao}%0AUsuário: ${user.nome}%0AData/Hora: ${new Date().toLocaleString('pt-BR')}`;
+      // Substitua abaixo pelo seu token e chat_id reais
+      const TELEGRAM_TOKEN = 'COLOQUE_SEU_TOKEN_AQUI';
+      const TELEGRAM_CHAT_ID = 'COLOQUE_SEU_CHAT_ID_AQUI';
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${msg}`);
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      setLoading(false);
+      return true;
     } catch (e) {
       alert('Erro ao registrar chamado!');
+      setLoading(false);
+      return false;
     }
-    setLoading(false);
   };
 
   return (
