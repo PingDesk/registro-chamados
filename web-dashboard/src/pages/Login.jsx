@@ -61,13 +61,7 @@ function Login({ onLogin }) {
       if (userData.senha === password) {
         console.log('Login bem-sucedido!');
         
-        // Bloquear Colaboradores de acessar o site
-        if (userData.tipo === 'Colaborador') {
-          console.log('Acesso negado: Colaborador não tem acesso ao site');
-          setError('Colaboradores têm acesso apenas ao aplicativo desktop');
-          setLoading(false);
-          return;
-        }
+        // Permitir login de Colaboradores normalmente (App.jsx já faz o redirecionamento correto)
         
         onLogin({
           id: userDoc.id,
