@@ -1,0 +1,2 @@
+# Build version
+v1.0.1 - Comissão dinâmica baseada no provedor
