@@ -24,16 +24,26 @@ function RegistroChamadosColaborador({ user, onLogout }) {
         criadoEm: serverTimestamp(),
       });
 
-      // Enviar para Telegram
-      const msg = `Novo chamado registrado:%0AProvedor: ${form.provedor}%0ACliente: ${form.cliente}%0AProtocolo: ${form.protocolo}%0AEndereço: ${form.endereco}%0AWhatsApp: ${form.whatsapp}%0ANível: ${form.nivel}%0ADescrição: ${form.descricao}%0AUsuário: ${user.nome}%0AData/Hora: ${new Date().toLocaleString('pt-BR')}`;
-      // Substitua abaixo pelo seu token e chat_id reais
-      const TELEGRAM_TOKEN = 'COLOQUE_SEU_TOKEN_AQUI';
-      const TELEGRAM_CHAT_ID = 'COLOQUE_SEU_CHAT_ID_AQUI';
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${msg}`);
+
+      // Enviar para Telegram (dados do app.py)
+      const TELEGRAM_TOKEN = '8353262305:AAG_kMgFVLGRQ8EwQjhyEUAkeOWBH-kTYhs';
+      const TELEGRAM_CHAT_ID = '-1003349243615';
+      const msg = `Novo chamado registrado:\nProvedor: ${form.provedor}\nCliente: ${form.cliente}\nProtocolo: ${form.protocolo}\nEndereço: ${form.endereco}\nWhatsApp: ${form.whatsapp}\nNível: ${form.nivel}\nDescrição: ${form.descricao}\nUsuário: ${user.nome}\nData/Hora: ${new Date().toLocaleString('pt-BR')}`;
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: msg,
+          parse_mode: 'HTML'
+        })
+      });
 
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => setSuccess(false), 1000);
       setLoading(false);
+      // Recarregar a página para limpar tudo
+      setTimeout(() => window.location.reload(), 1200);
       return true;
     } catch (e) {
       alert('Erro ao registrar chamado!');
