@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import ChamadoForm from '../components/ChamadoForm';
+import useProvedores from '../hooks/useProvedores';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../services/firebase';
+
 
 function RegistroChamadosColaborador({ user, onLogout }) {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const provedores = useProvedores();
+
+  // Garante que a data/hora seja sempre atual ao abrir o formulário
+  const getInitialData = () => ({ dataHora: new Date().toLocaleString('pt-BR') });
 
   const handleSave = async (form) => {
     setLoading(true);
@@ -13,7 +19,7 @@ function RegistroChamadosColaborador({ user, onLogout }) {
       await addDoc(collection(db, 'chamados'), {
         ...form,
         usuario: user.nome,
-        dataHora: form.dataHora || new Date().toLocaleString('pt-BR'),
+        dataHora: new Date().toLocaleString('pt-BR'),
         criadoEm: serverTimestamp(),
       });
       setSuccess(true);
@@ -31,7 +37,7 @@ function RegistroChamadosColaborador({ user, onLogout }) {
         <button onClick={onLogout} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}>Sair</button>
       </div>
       {success && <div style={{ color: 'green', marginBottom: 16 }}>Chamado registrado com sucesso!</div>}
-      <ChamadoForm onSave={handleSave} />
+      <ChamadoForm onSave={handleSave} provedores={provedores} initialData={getInitialData()} />
       {loading && <div style={{ marginTop: 16 }}>Salvando chamado...</div>}
     </div>
   );
