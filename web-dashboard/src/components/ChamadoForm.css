@@ -1,0 +1,9 @@
+/* Estilo básico para o formulário de chamados */
+.chamado-form { max-width: 600px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+.chamado-form .row { display: flex; gap: 16px; margin-bottom: 16px; }
+.chamado-form .cell { flex: 1; display: flex; flex-direction: column; }
+.chamado-form label { font-weight: 500; margin-bottom: 4px; }
+.chamado-form input, .chamado-form select, .chamado-form textarea { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+.chamado-form textarea { resize: vertical; }
+.chamado-form button[type="submit"] { background: #6366f1; color: #fff; border: none; border-radius: 4px; padding: 10px 24px; font-size: 1rem; cursor: pointer; margin-top: 16px; }
+.chamado-form button[type="submit"]:hover { background: #4f46e5; }
