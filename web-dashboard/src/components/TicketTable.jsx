@@ -11,6 +11,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
   const [editFormData, setEditFormData] = useState({
     usuario: '',
     cliente: '',
+    endereco: '',
     provedor: '',
     nivel: '',
     descricao: '',
@@ -171,6 +172,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     setEditFormData({
       usuario: chamado.usuario || '',
       cliente: chamado.cliente || '',
+      endereco: chamado.endereco || '',
       provedor: chamado.provedor || '',
       nivel: chamado.nivel || '',
       descricao: chamado.descricao || '',
@@ -199,12 +201,22 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     setEditFormData({
       usuario: '',
       cliente: '',
+      endereco: '',
       provedor: '',
       nivel: '',
       descricao: '',
       numero: '',
       protocolo: ''
     });
+                <div className="form-group">
+                  <label>Endereço</label>
+                  <input
+                    type="text"
+                    value={editFormData.endereco}
+                    onChange={(e) => setEditFormData({...editFormData, endereco: e.target.value})}
+                    placeholder="Endereço do cliente"
+                  />
+                </div>
   };
 
   const handleDelete = async (id) => {
@@ -300,6 +312,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
             <th>Data/Hora</th>
             {userTipo === 'Administrador' && <th>Colaborador</th>}
             <th>Cliente</th>
+            <th>Endereço</th>
             <th>Provedor</th>
             <th>Nível</th>
             <th>Valor</th>
@@ -324,6 +337,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
               <td>{chamado.dataHora}</td>
               {userTipo === 'Administrador' && <td>{chamado.usuario}</td>}
               <td>{chamado.cliente}</td>
+              <td>{chamado.endereco}</td>
               <td>{chamado.provedor}</td>
               <td>{chamado.nivel}</td>
               <td className="valor-cell">{calcularValorAtendimento(chamado, chamados)}</td>

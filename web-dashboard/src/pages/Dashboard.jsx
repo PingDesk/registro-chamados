@@ -305,6 +305,7 @@ function Dashboard({ user, onLogout }) {
     const data = filteredChamados.map((chamado, index) => ({
       'Data/Hora': chamado.dataHora,
       'Cliente': chamado.cliente,
+      'Endereço': chamado.endereco,
       'Provedor': chamado.provedor,
       'Protocolo': chamado.protocolo,
       'Número': chamado.numero,
