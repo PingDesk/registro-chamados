@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './ChamadoForm.css';
 
 function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis = [] }) {
@@ -13,9 +13,19 @@ function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis
     descricao: '',
   });
 
+
+  // Atualiza dataHora em tempo real
   useEffect(() => {
-    if (initialData) setForm({ ...form, ...initialData });
-    else setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
+    let intervalId;
+    if (initialData && initialData.dataHora) {
+      setForm(f => ({ ...f, ...initialData }));
+    } else {
+      setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
+    }
+    intervalId = setInterval(() => {
+      setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
+    }, 1000);
+    return () => clearInterval(intervalId);
   }, [initialData]);
 
   const handleChange = e => {
