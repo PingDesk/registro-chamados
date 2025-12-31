@@ -16,7 +16,9 @@ def resource_path(relative_path):
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+    path = os.path.join(base_path, relative_path)
+    print(f"[DEBUG] Icon path resolved: {path}")
+    return path
 
 # Configurações do Telegram
 TELEGRAM_TOKEN = "8353262305:AAG_kMgFVLGRQ8EwQjhyEUAkeOWBH-kTYhs"
@@ -56,32 +58,8 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # Cache local para quando Firebase exceder quota
-CACHE_FILE = 'usuarios_cache.json'
 
-def salvar_cache_usuarios(usuarios_data):
-    """Salva cache dos usuários em arquivo local"""
-    import json
-    try:
-        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(usuarios_data, f, ensure_ascii=False, indent=2)
-        print("[DEBUG] Cache de usuários salvo")
-    except Exception as e:
-        print(f"[DEBUG] Erro ao salvar cache: {e}")
 
-def carregar_cache_usuarios():
-    """Carrega cache dos usuários do arquivo local"""
-    import json
-    try:
-        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        print(f"[DEBUG] Cache carregado: {len(data)} usuários")
-        return data
-    except FileNotFoundError:
-        print("[DEBUG] Arquivo de cache não encontrado")
-        return None
-    except Exception as e:
-        print(f"[DEBUG] Erro ao carregar cache: {e}")
-        return None
 
 # Função removida - coleções já existem no Firebase
 # As verificações consumiam muita quota do Firebase
@@ -139,9 +117,7 @@ class LoginThread(QThread):
                 all_docs = usuarios_ref.get()
                 print(f"[DEBUG] Retornou {len(all_docs)} usuários")
                 
-                # Salva cache para uso futuro
-                usuarios_data = [{'id': doc.id, 'data': doc.to_dict()} for doc in all_docs]
-                salvar_cache_usuarios(usuarios_data)
+                # Não salva mais cache local
                 
                 resultado['usuarios'] = all_docs
                 resultado['concluido'] = True
@@ -163,28 +139,7 @@ class LoginThread(QThread):
         
         if not resultado['concluido']:
             print("[DEBUG] TIMEOUT - Firebase não respondeu em 15 segundos")
-            print("[DEBUG] Tentando usar cache local...")
-            
-            cache_data = carregar_cache_usuarios()
-            if cache_data:
-                print(f"[DEBUG] ✅ Cache encontrado com {len(cache_data)} usuários")
-                # Filtra localmente usando cache
-                usuario_encontrado = None
-                for user_info in cache_data:
-                    data = user_info['data']
-                    if data.get('nome') == self.nome and data.get('senha') == self.senha:
-                        usuario_id = user_info['id']
-                        usuario_tipo = data.get('tipo', 'Colaborador')
-                        print(f"[DEBUG] Login OK via CACHE! ID: {usuario_id}, Tipo: {usuario_tipo}")
-                        self.login_sucesso.emit(usuario_id, usuario_tipo)
-                        return
-                
-                print("[DEBUG] Usuário não encontrado no cache")
-                self.login_falhou.emit("Usuário ou senha inválidos\n\n(Firebase offline - usando cache local)")
-                return
-            
-            print("[DEBUG] ❌ Cache não disponível")
-            self.login_falhou.emit("Timeout: Firebase não está respondendo.\n\n⚠️ QUOTA EXCEDIDA\nO Firebase atingiu o limite gratuito.\n\nSoluções:\n1. Aguardar 24h\n2. Upgrade para plano pago")
+            self.login_falhou.emit("Timeout: Firebase não está respondendo.\n\nO Firebase atingiu o limite gratuito ou está offline.")
             return
         
         if resultado['erro']:
@@ -215,23 +170,28 @@ class LoginThread(QThread):
             self.login_falhou.emit("Usuário ou senha inválidos")
             self.login_falhou.emit(f"Erro ao conectar ao Firebase.\n\nDetalhes: {str(e)}")
         
-        docs = resultado['docs']
-        if docs:
-            doc = docs[0]
-            usuario_id = doc.id
-            usuario_data = doc.to_dict()
-            usuario_tipo = usuario_data.get('tipo', 'Colaborador')
-            print(f"[DEBUG] Login bem sucedido! ID: {usuario_id}, Tipo: {usuario_tipo}")
-            self.login_sucesso.emit(usuario_id, usuario_tipo)
-        else:
-            print("[DEBUG] Nenhum usuário encontrado")
-            self.login_falhou.emit("Usuário ou senha inválidos")
+        # Removido bloco docs que causava KeyError
 
 class Login(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Login")
-        self.setWindowIcon(QIcon(resource_path("assets/favicon.ico")))
+        # Testa o novo ícone android-chrome-192x192.ico com caminho absoluto
+        icon_path = os.path.abspath(resource_path("assets/teste.ico"))
+        print(f"[DEBUG] Icon absolute path: {icon_path}")
+        icon = QIcon(icon_path)
+        if icon.isNull():
+            print("[DEBUG] Custom icon not found ou inválido, usando fallback Qt icon.")
+            try:
+                icon = QApplication.style().standardIcon(QApplication.style().SP_ComputerIcon)
+            except Exception as e:
+                print(f"[DEBUG] Fallback icon error: {e}")
+        self._custom_icon = icon
+        self.setWindowIcon(self._custom_icon)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setWindowIcon(self._custom_icon)
         layout = QVBoxLayout()
         self.usuario = QLineEdit()
         self.usuario.setPlaceholderText("Usuário")
@@ -292,7 +252,21 @@ class AdminUsuarios(QWidget):
         super().__init__()
         self.usuario_id = usuario_id
         self.setWindowTitle("Painel de Administração")
-        self.setWindowIcon(QIcon(resource_path("assets/favicon.ico")))
+        icon_path = os.path.abspath(resource_path("assets/teste.ico"))
+        print(f"[DEBUG] Icon absolute path: {icon_path}")
+        icon = QIcon(icon_path)
+        if icon.isNull():
+            print("[DEBUG] Custom icon not found ou inválido, usando fallback Qt icon.")
+            try:
+                icon = QApplication.style().standardIcon(QApplication.style().SP_ComputerIcon)
+            except Exception as e:
+                print(f"[DEBUG] Fallback icon error: {e}")
+        self._custom_icon = icon
+        self.setWindowIcon(self._custom_icon)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setWindowIcon(self._custom_icon)
         self.setGeometry(100, 100, 600, 500)
         
         layout = QVBoxLayout()
@@ -737,7 +711,21 @@ class ChamadoApp(QWidget):
         super().__init__()
         self.usuario_id = usuario_id
         self.setWindowTitle("Registro de Chamados")
-        self.setWindowIcon(QIcon(resource_path("assets/favicon.ico")))
+        icon_path = os.path.abspath(resource_path("assets/teste.ico"))
+        print(f"[DEBUG] Icon absolute path: {icon_path}")
+        icon = QIcon(icon_path)
+        if icon.isNull():
+            print("[DEBUG] Custom icon not found ou inválido, usando fallback Qt icon.")
+            try:
+                icon = QApplication.style().standardIcon(QApplication.style().SP_ComputerIcon)
+            except Exception as e:
+                print(f"[DEBUG] Fallback icon error: {e}")
+        self._custom_icon = icon
+        self.setWindowIcon(self._custom_icon)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setWindowIcon(self._custom_icon)
         layout = QVBoxLayout()
 
         # Exibe data e hora atual
@@ -756,8 +744,13 @@ class ChamadoApp(QWidget):
         layout.addWidget(self.provedor)
 
         self.nome = QLineEdit()
+
         layout.addWidget(QLabel("Nome do Cadastro"))
         layout.addWidget(self.nome)
+
+        self.endereco = QLineEdit()
+        layout.addWidget(QLabel("Endereço"))
+        layout.addWidget(self.endereco)
 
         self.protocolo = QLineEdit()
         layout.addWidget(QLabel("Protocolo"))
@@ -885,13 +878,15 @@ class ChamadoApp(QWidget):
     def salvar(self):
         provedor = self.provedor.currentText()
         nome = self.nome.text()
+
         protocolo = self.protocolo.text()
         whatsapp = self.whatsapp.text()
+        endereco = self.endereco.text()
         descricao = self.descricao.toPlainText()
         nivel = self.nivel.currentText()
         data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-        if not nome or not protocolo or not whatsapp or not descricao:
+        if not nome or not protocolo or not whatsapp or not descricao or not endereco:
             QMessageBox.warning(self, "Erro", "Todos os campos são obrigatórios")
             return
 
@@ -952,6 +947,7 @@ class ChamadoApp(QWidget):
             'usuario': self.usuario_id,
             'provedor': provedor_id if provedor_id else provedor,
             'cliente': nome,
+            'endereco': endereco,
             'protocolo': protocolo,
             'numero': whatsapp,
             'descricao': descricao,
@@ -974,6 +970,7 @@ class ChamadoApp(QWidget):
             f"<b>Provedor:</b> {provedor}\n"
             f"<b>Data/Hora:</b> {data_hora}\n"
             f"<b>Nome do Cliente:</b> {nome}\n"
+            f"<b>Endereço:</b> {endereco}\n"
             f"<b>Protocolo:</b> {protocolo}\n"
             f"<b>WhatsApp:</b> {whatsapp}\n"
             f"<b>Nível:</b> {nivel}\n"
@@ -990,6 +987,7 @@ class ChamadoApp(QWidget):
         
         QMessageBox.information(self, "Sucesso", "Chamado salvo com sucesso")
         self.nome.clear()
+        self.endereco.clear()
         self.protocolo.clear()
         self.whatsapp.clear()
         self.descricao.clear()
