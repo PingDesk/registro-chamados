@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import RegistroChamadosColaborador from './pages/RegistroChamadosColaborador';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -32,7 +33,13 @@ function App() {
         />
         <Route 
           path="/dashboard" 
-          element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+          element={
+            user
+              ? user.tipo === 'Colaborador'
+                ? <RegistroChamadosColaborador user={user} onLogout={handleLogout} />
+                : <Dashboard user={user} onLogout={handleLogout} />
+              : <Navigate to="/login" />
+          }
         />
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
       </Routes>
