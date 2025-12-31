@@ -348,7 +348,6 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                     className="edit-btn"
                     onClick={() => handleEditStart(chamado)}
                     title={userTipo === 'Administrador' ? 'Editar chamado' : 'Visualizar chamado'}
-                    disabled={userTipo !== 'Administrador'}
                   >
                     {userTipo === 'Administrador' ? <Edit2 size={16} /> : 'Visualizar'}
                   </button>
