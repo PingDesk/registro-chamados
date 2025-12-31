@@ -987,18 +987,22 @@ function Dashboard({ user, onLogout }) {
                     <Download size={20} />
                     Exportar Excel
                   </button>
-
-                  <button className="export-btn" onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={20} />
-                    Importar Excel
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    style={{ display: 'none' }}
-                    onChange={handleImportExcel}
-                  />
+                  {/* Importar Excel só para Administrador */}
+                  {user.tipo === 'Administrador' && (
+                    <>
+                      <button className="export-btn" onClick={() => fileInputRef.current?.click()}>
+                        <Upload size={20} />
+                        Importar Excel
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        style={{ display: 'none' }}
+                        onChange={handleImportExcel}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
 

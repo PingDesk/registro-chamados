@@ -347,9 +347,10 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   <button 
                     className="edit-btn"
                     onClick={() => handleEditStart(chamado)}
-                    title="Editar chamado"
+                    title={userTipo === 'Administrador' ? 'Editar chamado' : 'Visualizar chamado'}
+                    disabled={userTipo !== 'Administrador'}
                   >
-                    <Edit2 size={16} />
+                    {userTipo === 'Administrador' ? <Edit2 size={16} /> : 'Visualizar'}
                   </button>
                   {userTipo === 'Administrador' && (
                     <button 
@@ -372,7 +373,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Editar Chamado</h3>
+              <h3>{userTipo === 'Administrador' ? 'Editar Chamado' : 'Visualizar Chamado'}</h3>
               <button className="btn-close" onClick={handleCloseModal}>
                 <X size={20} />
               </button>
@@ -386,6 +387,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   value={editFormData.usuario}
                   onChange={(e) => setEditFormData({...editFormData, usuario: e.target.value})}
                   placeholder="Nome do usuário"
+                  disabled={userTipo !== 'Administrador'}
                 />
               </div>
 
@@ -396,6 +398,18 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   value={editFormData.cliente}
                   onChange={(e) => setEditFormData({...editFormData, cliente: e.target.value})}
                   placeholder="Nome do cliente"
+                  disabled={userTipo !== 'Administrador'}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Endereço</label>
+                <input
+                  type="text"
+                  value={editFormData.endereco}
+                  onChange={(e) => setEditFormData({...editFormData, endereco: e.target.value})}
+                  placeholder="Endereço do cliente"
+                  disabled={userTipo !== 'Administrador'}
                 />
               </div>
 
@@ -404,6 +418,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                 <select
                   value={editFormData.provedor}
                   onChange={(e) => setEditFormData({...editFormData, provedor: e.target.value})}
+                  disabled={userTipo !== 'Administrador'}
                 >
                   <option value="">Selecione um provedor</option>
                   {provedores.map(prov => (
@@ -417,6 +432,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                 <select
                   value={editFormData.nivel}
                   onChange={(e) => setEditFormData({...editFormData, nivel: e.target.value})}
+                  disabled={userTipo !== 'Administrador'}
                 >
                   <option value="">Selecione um nível</option>
                   {niveis.map(niv => (
@@ -432,6 +448,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   value={editFormData.numero}
                   onChange={(e) => setEditFormData({...editFormData, numero: e.target.value})}
                   placeholder="Número do cliente"
+                  disabled={userTipo !== 'Administrador'}
                 />
               </div>
 
@@ -442,6 +459,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   value={editFormData.protocolo}
                   onChange={(e) => setEditFormData({...editFormData, protocolo: e.target.value})}
                   placeholder="Protocolo da plataforma"
+                  disabled={userTipo !== 'Administrador'}
                 />
               </div>
 
@@ -452,18 +470,21 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   onChange={(e) => setEditFormData({...editFormData, descricao: e.target.value})}
                   placeholder="Descrição do chamado"
                   rows="4"
+                  disabled={userTipo !== 'Administrador'}
                 />
               </div>
             </div>
 
             <div className="modal-footer">
               <button className="btn-secondary" onClick={handleCloseModal}>
-                Cancelar
+                Fechar
               </button>
-              <button className="btn-primary" onClick={handleEditSave}>
-                <Save size={16} />
-                Salvar Alterações
-              </button>
+              {userTipo === 'Administrador' && (
+                <button className="btn-primary" onClick={handleEditSave}>
+                  <Save size={16} />
+                  Salvar Alterações
+                </button>
+              )}
             </div>
           </div>
         </div>
