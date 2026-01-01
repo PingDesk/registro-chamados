@@ -5,6 +5,12 @@ import Dashboard from './pages/Dashboard';
 import RegistroChamadosColaborador from './pages/RegistroChamadosColaborador';
 
 function App() {
+    // Função utilitária para decidir rota inicial
+    const rotaInicial = () => {
+      if (!user) return '/login';
+      if (user.tipo === 'Colaborador') return '/registro-chamado';
+      return '/dashboard';
+    };
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -25,23 +31,52 @@ function App() {
   };
 
   return (
-    <Router basename="/registro-chamados">
+    <Router>
       <Routes>
         <Route 
           path="/login" 
-          element={user ? <Navigate to="/dashboard" /> : <Login onLogin={handleLogin} />} 
+          element={user ? (user.tipo === 'Colaborador' ? <Navigate to="/registro-chamado" /> : <Navigate to="/dashboard" />) : <Login onLogin={handleLogin} />} 
         />
         <Route 
           path="/dashboard" 
           element={
             user
               ? user.tipo === 'Colaborador'
-                ? <RegistroChamadosColaborador user={user} onLogout={handleLogout} />
+                ? <Navigate to="/registro-chamado" replace />
                 : <Dashboard user={user} onLogout={handleLogout} />
               : <Navigate to="/login" />
           }
         />
-        <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
+        <Route 
+          path="/registro-chamado" 
+          element={
+            user
+              ? user.tipo === 'Colaborador'
+                ? <RegistroChamadosColaborador user={user} onLogout={handleLogout} />
+                : <Navigate to="/dashboard" />
+              : <Navigate to="/login" />
+          }
+        />
+        {/* Rota raiz: só redireciona se não estiver na rota correta */}
+        <Route
+          path="/"
+          element={
+            user ? (
+              user.tipo === 'Colaborador' ? <Navigate to="/registro-chamado" replace /> : <Navigate to="/dashboard" replace />
+            ) : <Navigate to="/login" replace />
+          }
+        />
+        {/* Rota catch-all: nunca renderiza componentes, só redireciona para rota limpa */}
+        <Route
+          path="*"
+          element={
+            user ? (
+              user.tipo === 'Colaborador'
+                ? <Navigate to="/registro-chamado" replace />
+                : <Navigate to="/dashboard" replace />
+            ) : <Navigate to="/login" replace />
+          }
+        />
       </Routes>
     </Router>
   );

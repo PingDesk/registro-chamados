@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ChamadoForm from '../components/ChamadoForm';
 import useProvedores from '../hooks/useProvedores';
 
@@ -7,12 +8,23 @@ import { db } from '../services/firebase';
 
 
 function RegistroChamadosColaborador({ user, onLogout }) {
+  const navigate = useNavigate();
+
+  // Garante que a URL seja exatamente /registro-chamado
+  useEffect(() => {
+    if (window.location.pathname !== '/registro-chamado') {
+      navigate('/registro-chamado', { replace: true });
+    }
+  }, [navigate]);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const provedores = useProvedores();
 
   // Garante que a data/hora seja sempre atual ao abrir o formulário
-  const getInitialData = () => ({ dataHora: new Date().toLocaleString('pt-BR') });
+  // Gera um número único para o chamado (timestamp)
+  const getInitialData = () => ({
+    dataHora: new Date().toLocaleString('pt-BR'),
+  });
 
   const handleSave = async (form) => {
     setLoading(true);
@@ -28,22 +40,34 @@ function RegistroChamadosColaborador({ user, onLogout }) {
       // Enviar para Telegram (dados do app.py)
       const TELEGRAM_TOKEN = '8353262305:AAG_kMgFVLGRQ8EwQjhyEUAkeOWBH-kTYhs';
       const TELEGRAM_CHAT_ID = '-1003349243615';
-      const msg = `📞 Novo Chamado Aberto\n\nProvedor: ${form.provedor}\nData/Hora: ${new Date().toLocaleString('pt-BR')}\nNome do Cliente: ${form.cliente}\nEndereço: ${form.endereco}\nProtocolo: ${form.protocolo}\nWhatsApp: ${form.whatsapp}\nDescrição: ${form.descricao}`;
+      // Função para escapar caracteres especiais do MarkdownV2
+      function escapeMarkdownV2(text) {
+        return String(text).replace(/[\\_\*\[\]\(\)~`>#+\-=|{}.!]/g, '\\$&');
+      }
+
+      const msg =
+        `📞 Novo Chamado Aberto\n\n` +
+        `Provedor: ${escapeMarkdownV2(form.provedor)}\n` +
+        `Data/Hora: ${escapeMarkdownV2(new Date().toLocaleString('pt-BR'))}\n` +
+        `Nome do Cliente: ${escapeMarkdownV2(form.cliente)}\n` +
+        `Endereço: ${escapeMarkdownV2(form.endereco)}\n` +
+        `Protocolo: ${escapeMarkdownV2(form.protocolo)}\n` +
+        `WhatsApp: ${escapeMarkdownV2(form.whatsapp)}\n` +
+        `Descrição: ${escapeMarkdownV2(form.descricao)}`;
       await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: TELEGRAM_CHAT_ID,
           text: msg,
-          parse_mode: 'HTML'
+          parse_mode: 'MarkdownV2'
         })
       });
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 1000);
       setLoading(false);
-      // Recarregar a página para limpar tudo
-      setTimeout(() => window.location.reload(), 1200);
+      // O formulário será limpo pelo ChamadoForm ao retornar true
       return true;
     } catch (e) {
       alert('Erro ao registrar chamado!');
@@ -59,8 +83,13 @@ function RegistroChamadosColaborador({ user, onLogout }) {
         <button onClick={onLogout} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}>Sair</button>
       </div>
       {success && <div style={{ color: 'green', marginBottom: 16 }}>Chamado registrado com sucesso!</div>}
-      <ChamadoForm onSave={handleSave} provedores={provedores} initialData={getInitialData()} />
-      {loading && <div style={{ marginTop: 16 }}>Salvando chamado...</div>}
+      {/* Só renderiza o formulário se a URL estiver correta */}
+      {window.location.pathname === '/registro-chamado' && (
+        <>
+          <ChamadoForm onSave={handleSave} provedores={provedores} initialData={getInitialData()} />
+          {loading && <div style={{ marginTop: 16 }}>Salvando chamado...</div>}
+        </>
+      )}
     </div>
   );
 }

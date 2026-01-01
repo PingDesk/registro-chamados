@@ -11,20 +11,23 @@ function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis
     endereco: '',
     whatsapp: '',
     nivel: '',
+    // numero removido
     descricao: '',
   };
   const [form, setForm] = useState(emptyForm);
 
 
   // Atualiza dataHora em tempo real
-  useEffect(() => {
-    setForm(f => ({ ...emptyForm, ...initialData, dataHora: new Date().toLocaleString('pt-BR') }));
-    const intervalId = setInterval(() => {
-      setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
-    }, 1000);
-    return () => clearInterval(intervalId);
-    // eslint-disable-next-line
-  }, [JSON.stringify(initialData)]);
+    useEffect(() => {
+      // Inicializa o formulário apenas na montagem
+      setForm(f => ({ ...emptyForm, ...initialData }));
+      // Atualiza apenas o campo dataHora a cada segundo
+      const intervalId = setInterval(() => {
+        setForm(f => ({ ...f, dataHora: new Date().toLocaleString('pt-BR') }));
+      }, 1000);
+      return () => clearInterval(intervalId);
+      // eslint-disable-next-line
+    }, []);
 
   const handleChange = e => {
     const { name, value } = e.target;
@@ -78,6 +81,7 @@ function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis
           <input name="whatsapp" value={form.whatsapp} onChange={handleChange} required />
         </div>
       </div>
+
       <div className="row nivel-row">
         <label>Nível</label>
         <div className="nivel-options">

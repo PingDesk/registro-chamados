@@ -308,7 +308,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
               </th>
             )}
             <th>Protocolo</th>
-            <th>Número</th>
+            <th>WhatsApp</th>
             <th>Data/Hora</th>
             {userTipo === 'Administrador' && <th>Colaborador</th>}
             <th>Cliente</th>
@@ -333,7 +333,7 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                 </td>
               )}
               <td className="protocolo-cell">{chamado.protocolo}</td>
-              <td>{chamado.numero}</td>
+              <td>{chamado.whatsapp || chamado.numero}</td>
               <td>{chamado.dataHora}</td>
               {userTipo === 'Administrador' && <td>{chamado.usuario}</td>}
               <td>{chamado.cliente}</td>

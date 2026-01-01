@@ -41,7 +41,7 @@ function Dashboard({ user, onLogout }) {
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
   const [providers, setProviders] = useState([]);
-  const [niveis, setNiveis] = useState([]);
+  const [niveis, setNiveis] = useState(['N1', 'N2', 'Massivo']);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const fileInputRef = useRef(null);
@@ -71,13 +71,7 @@ function Dashboard({ user, onLogout }) {
         provedoresMap[doc.id] = doc.data().nome;
       });
       
-      // Carregar níveis para conversão de IDs
-      const niveisRef = collection(db, 'niveis');
-      const niveisSnapshot = await getDocs(niveisRef);
-      const niveisMap = {};
-      niveisSnapshot.docs.forEach(doc => {
-        niveisMap[doc.id] = doc.data().nivel;
-      });
+      // (Removido carregamento de níveis antigos)
       
       // Carregar usuários para conversão de IDs
       const usuariosRef = collection(db, 'usuarios');
@@ -89,12 +83,22 @@ function Dashboard({ user, onLogout }) {
       
       let chamadosData = chamadosSnapshot.docs.map(doc => {
         const data = doc.data();
+        // Normalizar nomenclatura dos níveis antigos para os novos
+        let nivel = (data.nivel || '').toLowerCase();
+        if (nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pré') || nivel.includes('pre')) {
+          nivel = 'N1';
+        } else if (nivel.includes('nível 2') || nivel.includes('nivel 2')) {
+          nivel = 'N2';
+        } else if (nivel.includes('massivo')) {
+          nivel = 'Massivo';
+        } else {
+          nivel = data.nivel;
+        }
         return {
           id: doc.id,
           ...data,
-          // Converter IDs para nomes se necessário
           provedor: provedoresMap[data.provedor] || data.provedor,
-          nivel: niveisMap[data.nivel] || data.nivel,
+          nivel: nivel,
           usuario: usuariosMap[data.usuario] || data.usuario
         };
       });
@@ -119,9 +123,7 @@ function Dashboard({ user, onLogout }) {
 
       setProviders(provedoresData);
 
-      // Carregar níveis
-      const niveisData = niveisSnapshot.docs.map(doc => doc.data().nivel);
-      setNiveis(niveisData);
+      // (Removido carregamento de níveis antigos)
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -275,7 +277,12 @@ function Dashboard({ user, onLogout }) {
       const franquia = parseInt(provedor.franquia) || 0;
 
       // Vendas sempre retornam 0 no cálculo individual (comissão já contabilizada separadamente)
-      const nivel = chamado.nivel?.toLowerCase() || '';
+      // Normalizar nível para garantir compatibilidade
+      let nivel = chamado.nivel?.toLowerCase() || '';
+      if (nivel === 'n1') nivel = 'nível 1 (sem acesso a equipamentos)';
+      if (nivel === 'n2') nivel = 'nível 2 (com acesso aos equipamentos)';
+      if (nivel === 'massivo') nivel = 'massivo (falhas na rede)';
+
       if (nivel.includes('venda')) {
         return 0;
       }
@@ -287,7 +294,7 @@ function Dashboard({ user, onLogout }) {
 
       // Fora da franquia, calcular valor
       let valor = 0;
-      
+
       if (nivel.includes('nível 1') || nivel.includes('nivel 1')) {
         valor = parseFloat(provedor.valorNivel1) || 0;
       } else if (nivel.includes('nível 2') || nivel.includes('nivel 2')) {
@@ -308,7 +315,7 @@ function Dashboard({ user, onLogout }) {
       'Endereço': chamado.endereco,
       'Provedor': chamado.provedor,
       'Protocolo': chamado.protocolo,
-      'Número': chamado.numero,
+      'WhatsApp': chamado.whatsapp || chamado.numero,
       'Descrição': chamado.descricao,
       'Nível': chamado.nivel,
       'Valor do Atendimento': calcularValorAtendimento(chamado, filteredChamados)
@@ -438,7 +445,7 @@ function Dashboard({ user, onLogout }) {
               usuario: row['Usuário'] || row['Usuario'] || row['Colaborador'] || 'NULL',
               cliente: row['Cliente'] || 'NULL',
               protocolo: row['Protocolo'] || 'NULL',
-              numero: row['Número'] || row['Numero'] || 'NULL',
+              whatsapp: row['WhatsApp'] || row['Whatsapp'] || row['Número'] || row['Numero'] || 'NULL',
               provedor: row['Provedor'] || 'NULL',
               nivel: row['Nível'] || row['Nivel'] || 'NULL',
               descricao: row['Descrição'] || row['Descricao'] || 'NULL',
