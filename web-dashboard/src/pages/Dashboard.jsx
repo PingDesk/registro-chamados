@@ -84,12 +84,13 @@ function Dashboard({ user, onLogout }) {
       let chamadosData = chamadosSnapshot.docs.map(doc => {
         const data = doc.data();
         // Normalizar nomenclatura dos níveis antigos para os novos
-        let nivel = (data.nivel || '').toLowerCase();
-        if (nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pré') || nivel.includes('pre')) {
-          nivel = 'N1';
-        } else if (nivel.includes('nível 2') || nivel.includes('nivel 2')) {
-          nivel = 'N2';
-        } else if (nivel.includes('massivo')) {
+        let nivel = (data.nivel || '').toString().toUpperCase();
+
+        if (nivel === 'N1' || nivel.includes('NÍVEL 1') || nivel.includes('NIVEL 1') || nivel.includes('PRE')) {
+  nivel = 'N1';
+        } else if (nivel === 'N2' || nivel.includes('NÍVEL 2') || nivel.includes('NIVEL 2')) {
+  nivel = 'N2';
+        } else if (nivel.includes('MASSIVO')) {
           nivel = 'Massivo';
         } else {
           nivel = data.nivel;
