@@ -84,24 +84,23 @@ function Dashboard({ user, onLogout }) {
       let chamadosData = chamadosSnapshot.docs.map(doc => {
         const data = doc.data();
         // Normalizar nomenclatura dos níveis antigos para os novos
-        let nivel = (data.nivel || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-        // Trata qualquer variação de "pré vendas", "pre vendas", "pré", "pre" como N1
+        let nivelRaw = (data.nivel || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        let nivel = '';
         if (
-          nivel === 'n1' ||
-          nivel.includes('nivel 1') ||
-          nivel.includes('pre vendas') ||
-          nivel.includes('pre-vendas') ||
-          nivel === 'pre' ||
-          nivel === 'pre vendas'
+          nivelRaw === 'n1' ||
+          nivelRaw.includes('nivel 1') ||
+          nivelRaw.includes('pre vendas') ||
+          nivelRaw.includes('pre-vendas') ||
+          nivelRaw === 'pre' ||
+          nivelRaw === 'pre vendas'
         ) {
           nivel = 'N1';
-        } else if (nivel === 'n2' || nivel.includes('nivel 2')) {
+        } else if (nivelRaw === 'n2' || nivelRaw.includes('nivel 2')) {
           nivel = 'N2';
-        } else if (nivel.includes('massivo')) {
+        } else if (nivelRaw.includes('massivo')) {
           nivel = 'Massivo';
         } else {
-          nivel = data.nivel;
+          nivel = '';
         }
         return {
           id: doc.id,
