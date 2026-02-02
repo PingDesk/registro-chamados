@@ -84,13 +84,21 @@ function Dashboard({ user, onLogout }) {
       let chamadosData = chamadosSnapshot.docs.map(doc => {
         const data = doc.data();
         // Normalizar nomenclatura dos níveis antigos para os novos
-        let nivel = (data.nivel || '').toString().toUpperCase();
+        let nivel = (data.nivel || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-        if (nivel === 'N1' || nivel.includes('NÍVEL 1') || nivel.includes('NIVEL 1') || nivel.includes('PRE')) {
+        // Trata qualquer variação de "pré vendas", "pre vendas", "pré", "pre" como N1
+        if (
+          nivel === 'n1' ||
+          nivel.includes('nivel 1') ||
+          nivel.includes('pre vendas') ||
+          nivel.includes('pre-vendas') ||
+          nivel === 'pre' ||
+          nivel === 'pre vendas'
+        ) {
           nivel = 'N1';
-        } else if (nivel === 'N2' || nivel.includes('NÍVEL 2') || nivel.includes('NIVEL 2')) {
+        } else if (nivel === 'n2' || nivel.includes('nivel 2')) {
           nivel = 'N2';
-        } else if (nivel.includes('MASSIVO')) {
+        } else if (nivel.includes('massivo')) {
           nivel = 'Massivo';
         } else {
           nivel = data.nivel;
@@ -150,7 +158,11 @@ function Dashboard({ user, onLogout }) {
 
     // Filtro de nível
     if (filterNivel !== 'todos') {
-      filtered = filtered.filter(chamado => chamado.nivel === filterNivel);
+      // Permite filtrar corretamente independente de variação de maiúsculas/minúsculas
+      filtered = filtered.filter(chamado => {
+        if (!chamado.nivel) return false;
+        return chamado.nivel.toString().toLowerCase() === filterNivel.toLowerCase();
+      });
     }
 
     // Filtro de provedor
@@ -974,9 +986,9 @@ function Dashboard({ user, onLogout }) {
                     <Filter size={18} />
                     <select value={filterNivel} onChange={(e) => setFilterNivel(e.target.value)}>
                       <option value="todos">Todos os Níveis</option>
-                      {niveis.map(nivel => (
-                        <option key={nivel} value={nivel}>{nivel}</option>
-                      ))}
+                      <option value="N1">Nível 1</option>
+                      <option value="N2">Nível 2</option>
+                      <option value="Massivo">Massivo</option>
                     </select>
                   </div>
 
