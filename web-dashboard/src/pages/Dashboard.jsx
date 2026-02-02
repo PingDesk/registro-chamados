@@ -84,7 +84,7 @@ function Dashboard({ user, onLogout }) {
       let chamadosData = chamadosSnapshot.docs.map(doc => {
         const data = doc.data();
         // Normalizar nomenclatura dos níveis antigos para os novos
-        let nivelRaw = (data.nivel || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        let nivelRaw = (data.nivel || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
         let nivel = '';
         if (
           nivelRaw === 'n1' ||
@@ -95,7 +95,13 @@ function Dashboard({ user, onLogout }) {
           nivelRaw === 'pre vendas'
         ) {
           nivel = 'N1';
-        } else if (nivelRaw === 'n2' || nivelRaw.includes('nivel 2')) {
+        } else if (
+          nivelRaw === 'n2' ||
+          nivelRaw.includes('nivel 2') ||
+          nivelRaw.replace(/[^a-z0-9]/g, '').includes('nivel2') ||
+          /nivel ?2/.test(nivelRaw) ||
+          /nivel2/.test(nivelRaw)
+        ) {
           nivel = 'N2';
         } else if (nivelRaw.includes('massivo')) {
           nivel = 'Massivo';
