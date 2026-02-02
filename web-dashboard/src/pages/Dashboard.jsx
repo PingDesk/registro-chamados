@@ -86,24 +86,11 @@ function Dashboard({ user, onLogout }) {
         // Normalizar nomenclatura dos níveis antigos para os novos
         let nivelRaw = (data.nivel || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
         let nivel = '';
-        if (
-          nivelRaw === 'n1' ||
-          nivelRaw.includes('nivel 1') ||
-          nivelRaw.includes('pre vendas') ||
-          nivelRaw.includes('pre-vendas') ||
-          nivelRaw === 'pre' ||
-          nivelRaw === 'pre vendas'
-        ) {
+        if (nivelRaw === 'n1' || nivelRaw === 'nivel 1') {
           nivel = 'N1';
-        } else if (
-          nivelRaw === 'n2' ||
-          nivelRaw.includes('nivel 2') ||
-          nivelRaw.replace(/[^a-z0-9]/g, '').includes('nivel2') ||
-          /nivel ?2/.test(nivelRaw) ||
-          /nivel2/.test(nivelRaw)
-        ) {
+        } else if (nivelRaw === 'n2' || nivelRaw === 'nivel 2') {
           nivel = 'N2';
-        } else if (nivelRaw.includes('massivo')) {
+        } else if (nivelRaw === 'massivo') {
           nivel = 'Massivo';
         } else {
           nivel = '';
