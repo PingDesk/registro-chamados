@@ -633,7 +633,7 @@ function Dashboard({ user, onLogout }) {
 
       valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.vendas;
 
-      byProvider[provider.nome] = { stats, valores, provider, franquia, chamadosForaFranquia };
+      byProvider[provider.nome] = { stats, valores, provider, franquia };
     });
 
     return byProvider;
