@@ -34,7 +34,7 @@ import './Dashboard.css';
 function Dashboard({ user, onLogout }) {
   const [chamados, setChamados] = useState([]);
   const [filteredChamados, setFilteredChamados] = useState([]);
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterNivel, setFilterNivel] = useState('todos');
   const [filterProvider, setFilterProvider] = useState('todos');
@@ -161,7 +161,7 @@ function Dashboard({ user, onLogout }) {
       // Permite filtrar corretamente independente de variação de maiúsculas/minúsculas
       filtered = filtered.filter(chamado => {
         if (!chamado.nivel) return false;
-        return chamado.nivel.toString().toLowerCase() === filterNivel.toLowerCase();
+           return chamado.nivel.toString().toLowerCase() === filterNivel.toLowerCase();
       });
     }
 
@@ -591,10 +591,7 @@ function Dashboard({ user, onLogout }) {
       
       const stats = {
         total: providerChamados.length,
-        nivel1: providerChamados.filter(c => {
-          const nivel = c.nivel?.toLowerCase() || '';
-          return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pre');
-        }).length,
+           nivel1: providerChamados.filter(c => c.nivel === 'N1').length,
         nivel2: providerChamados.filter(c => {
           const nivel = c.nivel?.toLowerCase() || '';
           return nivel.includes('nível 2') || nivel.includes('nivel 2');
@@ -612,7 +609,7 @@ function Dashboard({ user, onLogout }) {
       // Contar chamados que estão dentro da franquia (N1, N2)
       const chamadosNaFranquia = providerChamados.filter(c => {
         const nivel = c.nivel?.toLowerCase() || '';
-        return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('nível 2') || nivel.includes('nivel 2') || nivel.includes('pre');
+           return nivel === 'n1' || nivel === 'n2';
       });
 
       const franquia = provider.franquia || 0;
@@ -621,12 +618,12 @@ function Dashboard({ user, onLogout }) {
       // Calcular valores considerando franquia
       const nivel1Count = providerChamados.filter(c => {
         const nivel = c.nivel?.toLowerCase() || '';
-        return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pre');
+           return nivel === 'n1';
       }).length;
 
       const nivel2Count = providerChamados.filter(c => {
         const nivel = c.nivel?.toLowerCase() || '';
-        return nivel.includes('nível 2') || nivel.includes('nivel 2');
+           return nivel === 'n2';
       }).length;
 
       // Distribuir chamados fora da franquia proporcionalmente (sem perder excedentes)
