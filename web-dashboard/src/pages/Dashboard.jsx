@@ -596,11 +596,8 @@ function Dashboard({ user, onLogout }) {
       
       const stats = {
         total: providerChamados.length,
-           nivel1: providerChamados.filter(c => c.nivel === 'N1').length,
-        nivel2: providerChamados.filter(c => {
-          const nivel = c.nivel?.toLowerCase() || '';
-          return nivel.includes('nível 2') || nivel.includes('nivel 2');
-        }).length,
+        nivel1: providerChamados.filter(c => c.nivel === 'N1').length, // total bruto
+        nivel2: providerChamados.filter(c => c.nivel === 'N2').length, // total bruto
         vendas: providerChamados.filter(c => {
           const nivel = c.nivel?.toLowerCase() || '';
           return nivel.includes('venda');
@@ -611,55 +608,22 @@ function Dashboard({ user, onLogout }) {
         }).length
       };
 
-      // Contar chamados que estão dentro da franquia (N1, N2)
-      const chamadosNaFranquia = providerChamados.filter(c => {
-        const nivel = c.nivel?.toLowerCase() || '';
-           return nivel === 'n1' || nivel === 'n2';
-      });
-
+      // Calcular valores considerando franquia (apenas excedente, FIFO)
       const franquia = provider.franquia || 0;
-      const chamadosForaFranquia = Math.max(0, chamadosNaFranquia.length - franquia);
+      // Ordena chamados N1 e N2 por data de abertura (FIFO)
+      const chamadosN1N2 = providerChamados
+        .filter(c => c.nivel === 'N1' || c.nivel === 'N2')
+        .sort((a, b) => {
+          const dataA = typeof a.dataHora === 'string' ? a.dataHora : String(a.dataHora || '');
+          const dataB = typeof b.dataHora === 'string' ? b.dataHora : String(b.dataHora || '');
+          return dataA.localeCompare(dataB);
+        });
 
-      // Calcular valores considerando franquia
-      const nivel1Count = providerChamados.filter(c => {
-        const nivel = c.nivel?.toLowerCase() || '';
-           return nivel === 'n1';
-      }).length;
-
-      const nivel2Count = providerChamados.filter(c => {
-        const nivel = c.nivel?.toLowerCase() || '';
-           return nivel === 'n2';
-      }).length;
-
-      // Distribuir chamados fora da franquia proporcionalmente (sem perder excedentes)
-      const totalFranquiaTypes = nivel1Count + nivel2Count;
-      let nivel1Cobrados = 0;
-      let nivel2Cobrados = 0;
-
-      if (chamadosForaFranquia > 0 && totalFranquiaTypes > 0) {
-        // Distribuição proporcional, mas garantindo que a soma seja igual ao total de excedentes
-        const rawNivel1 = chamadosForaFranquia * (nivel1Count / totalFranquiaTypes);
-        const rawNivel2 = chamadosForaFranquia * (nivel2Count / totalFranquiaTypes);
-
-        // Arredondar para baixo
-        nivel1Cobrados = Math.floor(rawNivel1);
-        nivel2Cobrados = Math.floor(rawNivel2);
-
-        // Corrigir diferença para garantir que a soma seja igual ao total de excedentes
-        let distribuido = nivel1Cobrados + nivel2Cobrados;
-        let diff = chamadosForaFranquia - distribuido;
-        // Distribuir o restante para os tipos com maior parte decimal
-        const decimais = [
-          { tipo: 'nivel1', valor: rawNivel1 - nivel1Cobrados },
-          { tipo: 'nivel2', valor: rawNivel2 - nivel2Cobrados }
-        ];
-        decimais.sort((a, b) => b.valor - a.valor);
-        for (let i = 0; i < decimais.length && diff > 0; i++) {
-          if (decimais[i].tipo === 'nivel1') nivel1Cobrados++;
-          if (decimais[i].tipo === 'nivel2') nivel2Cobrados++;
-          diff--;
-        }
-      }
+      // Os primeiros 'franquia' chamados não são cobrados
+      const chamadosExcedentes = chamadosN1N2.slice(franquia);
+      // Conta quantos excedentes são N1 e quantos são N2
+      const nivel1Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N1').length;
+      const nivel2Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N2').length;
 
       const valores = {
         fixo: provider.valorFixo || 0,
