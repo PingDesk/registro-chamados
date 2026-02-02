@@ -425,6 +425,12 @@ function Dashboard({ user, onLogout }) {
   };
 
   const handleImportExcel = (e) => {
+    // Permitir importação apenas para administradores
+    if (!user || user.tipo !== 'Administrador') {
+      alert('Apenas administradores podem importar planilhas.');
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 

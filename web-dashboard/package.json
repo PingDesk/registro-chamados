@@ -6,7 +6,7 @@
   "homepage": "https://pingdesk.github.io/registro-chamados/",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && copy /Y dist\\index.html dist\\404.html",
+    "build": "vite build && cp dist/index.html dist/404.html || true",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
