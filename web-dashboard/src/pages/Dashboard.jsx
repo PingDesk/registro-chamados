@@ -41,7 +41,7 @@ function Dashboard({ user, onLogout }) {
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
   const [providers, setProviders] = useState([]);
-  const [niveis, setNiveis] = useState(['N1', 'N2', 'Massivo']);
+  const [niveis, setNiveis] = useState(['N1', 'N2', 'Massivo']); // Pré Vendas removido
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const fileInputRef = useRef(null);
@@ -87,9 +87,9 @@ function Dashboard({ user, onLogout }) {
         let nivel = (data.nivel || '').toString().toUpperCase();
 
         if (nivel === 'N1' || nivel.includes('NÍVEL 1') || nivel.includes('NIVEL 1') || nivel.includes('PRE')) {
-  nivel = 'N1';
+          nivel = 'N1';
         } else if (nivel === 'N2' || nivel.includes('NÍVEL 2') || nivel.includes('NIVEL 2')) {
-  nivel = 'N2';
+          nivel = 'N2';
         } else if (nivel.includes('MASSIVO')) {
           nivel = 'Massivo';
         } else {
@@ -161,13 +161,13 @@ function Dashboard({ user, onLogout }) {
     // Filtro de data inicial
     if (filterDateStart) {
       filtered = filtered.filter(chamado => {
-        const chamadoDate = chamado.dataHora?.split(' ')[0]; // Extrai apenas a data (DD/MM/YYYY)
+        let dataHora = chamado.dataHora;
+        if (typeof dataHora !== 'string') dataHora = String(dataHora);
+        const chamadoDate = dataHora.split(' ')[0]; // Extrai apenas a data (DD/MM/YYYY)
         if (!chamadoDate) return true;
-        
         const [day, month, year] = chamadoDate.split('/');
         const chamadoDateObj = new Date(year, month - 1, day);
         const startDateObj = new Date(filterDateStart);
-        
         return chamadoDateObj >= startDateObj;
       });
     }
@@ -175,13 +175,13 @@ function Dashboard({ user, onLogout }) {
     // Filtro de data final
     if (filterDateEnd) {
       filtered = filtered.filter(chamado => {
-        const chamadoDate = chamado.dataHora?.split(' ')[0];
+        let dataHora = chamado.dataHora;
+        if (typeof dataHora !== 'string') dataHora = String(dataHora);
+        const chamadoDate = dataHora.split(' ')[0];
         if (!chamadoDate) return true;
-        
         const [day, month, year] = chamadoDate.split('/');
         const chamadoDateObj = new Date(year, month - 1, day);
         const endDateObj = new Date(filterDateEnd);
-        
         return chamadoDateObj <= endDateObj;
       });
     }
@@ -268,8 +268,8 @@ function Dashboard({ user, onLogout }) {
 
       // Ordenar por data/hora
       chamadosDoProvedor.sort((a, b) => {
-        const dataA = a.dataHora || '';
-        const dataB = b.dataHora || '';
+        const dataA = typeof a.dataHora === 'string' ? a.dataHora : String(a.dataHora || '');
+        const dataB = typeof b.dataHora === 'string' ? b.dataHora : String(b.dataHora || '');
         return dataA.localeCompare(dataB);
       });
 
@@ -359,14 +359,14 @@ function Dashboard({ user, onLogout }) {
         'Valor Total': 0
       });
 
-      // Nível 1 + Pré Vendas (excedente)
-      const nivel1PreVendasCount = stats.nivel1PreVendas;
-      const nivel1PreVendasValor = provider.valorNivel1 || 0;
+      // Nível 1 (excedente)
+      const nivel1Count = stats.nivel1;
+      const nivel1Valor = provider.valorNivel1 || 0;
       fechamentoData.push({
-        'Item': 'Nível 1 + Pré Vendas (excedente)',
-        'Quantidade': nivel1PreVendasCount,
-        'Valor Unitário': nivel1PreVendasValor,
-        'Valor Total': valores.nivel1 + valores.preVendas
+        'Item': 'Nível 1 (excedente)',
+        'Quantidade': nivel1Count,
+        'Valor Unitário': nivel1Valor,
+        'Valor Total': valores.nivel1
       });
 
       // Nível 2 (excedente)
@@ -447,8 +447,15 @@ function Dashboard({ user, onLogout }) {
 
         for (const row of jsonData) {
           try {
+            let dataHora = row['Data/Hora'] || format(new Date(), 'dd/MM/yyyy HH:mm:ss');
+            // Se vier como Date, converte para string no formato brasileiro
+            if (dataHora instanceof Date) {
+              dataHora = format(dataHora, 'dd/MM/yyyy HH:mm:ss');
+            } else {
+              dataHora = String(dataHora);
+            }
             const chamado = {
-              dataHora: row['Data/Hora'] || format(new Date(), 'dd/MM/yyyy HH:mm:ss'),
+              dataHora,
               usuario: row['Usuário'] || row['Usuario'] || row['Colaborador'] || 'NULL',
               cliente: row['Cliente'] || 'NULL',
               protocolo: row['Protocolo'] || 'NULL',
@@ -496,11 +503,10 @@ function Dashboard({ user, onLogout }) {
       valores.nivel1 += providerValores.nivel1;
       valores.nivel2 += providerValores.nivel2;
       valores.massivo += providerValores.massivo;
-      valores.preVendas += providerValores.preVendas;
       valores.vendas += providerValores.vendas;
     });
 
-    valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.preVendas + valores.vendas;
+    valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.vendas;
 
     return valores;
   };
@@ -515,7 +521,9 @@ function Dashboard({ user, onLogout }) {
 
       try {
         // Extrair data do chamado (formato: "DD/MM/YYYY HH:mm:ss")
-        const dataParts = chamado.dataHora.split(' ')[0].split('/');
+        let dataHora = chamado.dataHora;
+        if (typeof dataHora !== 'string') dataHora = String(dataHora);
+        const dataParts = dataHora.split(' ')[0].split('/');
         if (dataParts.length !== 3) return true;
 
         const diaChamado = parseInt(dataParts[0]);
@@ -571,9 +579,9 @@ function Dashboard({ user, onLogout }) {
       
       const stats = {
         total: providerChamados.length,
-        nivel1PreVendas: providerChamados.filter(c => {
+        nivel1: providerChamados.filter(c => {
           const nivel = c.nivel?.toLowerCase() || '';
-          return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pré') || nivel.includes('pre');
+          return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pre');
         }).length,
         nivel2: providerChamados.filter(c => {
           const nivel = c.nivel?.toLowerCase() || '';
@@ -589,12 +597,10 @@ function Dashboard({ user, onLogout }) {
         }).length
       };
 
-      // Contar chamados que estão dentro da franquia (N1, N2, Pré Vendas)
+      // Contar chamados que estão dentro da franquia (N1, N2)
       const chamadosNaFranquia = providerChamados.filter(c => {
         const nivel = c.nivel?.toLowerCase() || '';
-        return nivel.includes('nível 1') || nivel.includes('nivel 1') || 
-               nivel.includes('nível 2') || nivel.includes('nivel 2') ||
-               nivel.includes('pré') || nivel.includes('pre');
+        return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('nível 2') || nivel.includes('nivel 2') || nivel.includes('pre');
       });
 
       const franquia = provider.franquia || 0;
@@ -603,7 +609,7 @@ function Dashboard({ user, onLogout }) {
       // Calcular valores considerando franquia
       const nivel1Count = providerChamados.filter(c => {
         const nivel = c.nivel?.toLowerCase() || '';
-        return nivel.includes('nível 1') || nivel.includes('nivel 1');
+        return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pre');
       }).length;
 
       const nivel2Count = providerChamados.filter(c => {
@@ -611,42 +617,32 @@ function Dashboard({ user, onLogout }) {
         return nivel.includes('nível 2') || nivel.includes('nivel 2');
       }).length;
 
-      const preVendasCount = providerChamados.filter(c => {
-        const nivel = c.nivel?.toLowerCase() || '';
-        return nivel.includes('pré') || nivel.includes('pre');
-      }).length;
-
       // Distribuir chamados fora da franquia proporcionalmente (sem perder excedentes)
-      const totalFranquiaTypes = nivel1Count + nivel2Count + preVendasCount;
+      const totalFranquiaTypes = nivel1Count + nivel2Count;
       let nivel1Cobrados = 0;
       let nivel2Cobrados = 0;
-      let preVendasCobrados = 0;
 
       if (chamadosForaFranquia > 0 && totalFranquiaTypes > 0) {
         // Distribuição proporcional, mas garantindo que a soma seja igual ao total de excedentes
         const rawNivel1 = chamadosForaFranquia * (nivel1Count / totalFranquiaTypes);
         const rawNivel2 = chamadosForaFranquia * (nivel2Count / totalFranquiaTypes);
-        const rawPreVendas = chamadosForaFranquia * (preVendasCount / totalFranquiaTypes);
 
         // Arredondar para baixo
         nivel1Cobrados = Math.floor(rawNivel1);
         nivel2Cobrados = Math.floor(rawNivel2);
-        preVendasCobrados = Math.floor(rawPreVendas);
 
         // Corrigir diferença para garantir que a soma seja igual ao total de excedentes
-        let distribuido = nivel1Cobrados + nivel2Cobrados + preVendasCobrados;
+        let distribuido = nivel1Cobrados + nivel2Cobrados;
         let diff = chamadosForaFranquia - distribuido;
         // Distribuir o restante para os tipos com maior parte decimal
         const decimais = [
           { tipo: 'nivel1', valor: rawNivel1 - nivel1Cobrados },
-          { tipo: 'nivel2', valor: rawNivel2 - nivel2Cobrados },
-          { tipo: 'preVendas', valor: rawPreVendas - preVendasCobrados }
+          { tipo: 'nivel2', valor: rawNivel2 - nivel2Cobrados }
         ];
         decimais.sort((a, b) => b.valor - a.valor);
         for (let i = 0; i < decimais.length && diff > 0; i++) {
           if (decimais[i].tipo === 'nivel1') nivel1Cobrados++;
           if (decimais[i].tipo === 'nivel2') nivel2Cobrados++;
-          if (decimais[i].tipo === 'preVendas') preVendasCobrados++;
           diff--;
         }
       }
@@ -659,7 +655,6 @@ function Dashboard({ user, onLogout }) {
           const nivel = c.nivel?.toLowerCase() || '';
           return nivel.includes('massivo');
         }).length * (provider.valorMassivo || 0),
-        preVendas: preVendasCobrados * (provider.valorPreVenda || 0),
         vendas: providerChamados
           .filter(c => {
             const nivel = c.nivel?.toLowerCase() || '';
@@ -671,7 +666,7 @@ function Dashboard({ user, onLogout }) {
           }, 0)
       };
 
-      valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.preVendas + valores.vendas;
+      valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.vendas;
 
       byProvider[provider.nome] = { stats, valores, provider, franquia, chamadosForaFranquia };
     });
@@ -684,9 +679,9 @@ function Dashboard({ user, onLogout }) {
 
   const stats = {
     total: chamados.length,
-    nivel1PreVendas: chamados.filter(c => {
+    nivel1: chamados.filter(c => {
       const nivel = c.nivel?.toLowerCase() || '';
-      return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pré') || nivel.includes('pre');
+      return nivel.includes('nível 1') || nivel.includes('nivel 1') || nivel.includes('pre');
     }).length,
     nivel2: chamados.filter(c => {
       const nivel = c.nivel?.toLowerCase() || '';
@@ -794,8 +789,8 @@ function Dashboard({ user, onLogout }) {
                   color="#667eea"
                 />
                 <StatsCard 
-                  title="Nível 1 + Pré Vendas" 
-                  value={stats.nivel1PreVendas} 
+                  title="Nível 1" 
+                  value={stats.nivel1} 
                   icon={<AlertCircle />}
                   color="#f59e0b"
                 />
@@ -847,12 +842,7 @@ function Dashboard({ user, onLogout }) {
                     icon={<DollarSign />}
                     color="#8b5cf6"
                   />
-                  <StatsCard 
-                    title="Pré Vendas" 
-                    value={`R$ ${valores.preVendas.toFixed(2)}`} 
-                    icon={<DollarSign />}
-                    color="#ec4899"
-                  />
+
                   <StatsCard 
                     title="Vendas" 
                     value={`R$ ${valores.vendas.toFixed(2)}`} 
@@ -890,8 +880,8 @@ function Dashboard({ user, onLogout }) {
                             color="#667eea"
                           />
                           <StatsCard 
-                            title="N1 + Pré Vendas" 
-                            value={data.stats.nivel1PreVendas} 
+                            title="Nível 1" 
+                            value={data.stats.nivel1} 
                             icon={<AlertCircle />}
                             color="#f59e0b"
                           />
@@ -944,12 +934,7 @@ function Dashboard({ user, onLogout }) {
                             icon={<DollarSign />}
                             color="#8b5cf6"
                           />
-                          <StatsCard 
-                            title="Pré Vendas" 
-                            value={`R$ ${data.valores.preVendas.toFixed(2)}`} 
-                            icon={<DollarSign />}
-                            color="#ec4899"
-                          />
+
                           <StatsCard 
                             title="Vendas" 
                             value={`R$ ${data.valores.vendas.toFixed(2)}`} 
