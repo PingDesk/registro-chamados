@@ -5,6 +5,7 @@ import { Edit2, Trash2, X, Save, Trash } from 'lucide-react';
 import './TicketTable.css';
 
 function TicketTable({ chamados, onRefresh, userTipo }) {
+    const [filterColaborador, setFilterColaborador] = useState('todos');
   const [editingId, setEditingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -135,10 +136,19 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     const posicao = chamadosDoProvedor.findIndex(c => c.id === chamado.id) + 1;
     const franquia = parseInt(provedor.franquia) || 0;
 
-    // Verificar se é uma venda - sempre retorna R$ 0,00 na tabela
+    // Verificar se é uma venda instalada - exibe comissão negociada
     const nivel = (chamado.nivel || '').toLowerCase().trim();
     if (nivel.includes('venda')) {
-      return 'R$ 0,00';
+      // Comissão: usa campo salvo ou calcula na hora
+      let comissao = Number(chamado.comissao);
+      if (!comissao || comissao === 0) {
+        let percentual = provedor.comissao ? Number(provedor.comissao) : 0;
+        let valorPlanoStr = chamado.valorPlano ? String(chamado.valorPlano).replace(/\s/g, '') : '0';
+        if (valorPlanoStr.includes(',')) valorPlanoStr = valorPlanoStr.replace(',', '.');
+        let valorPlano = Number(valorPlanoStr);
+        comissao = valorPlano * (percentual / 100);
+      }
+      return `R$ ${comissao.toFixed(2)}`;
     }
 
     // Se está dentro da franquia, valor é R$ 0,00
@@ -150,8 +160,8 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     let valor = 0;
 
     // Detectar o nível e buscar o valor correspondente
-    if (nivel.includes('1') && !nivel.includes('2')) {
-      // Nível 1
+    if ((nivel.includes('1') && !nivel.includes('2')) || nivel.includes('pré') || nivel.includes('pre')) {
+      // Nível 1 ou Pré Vendas
       valor = parseFloat(provedor.valorNivel1) || 0;
     } else if (nivel.includes('2')) {
       // Nível 2
@@ -159,9 +169,6 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
     } else if (nivel.includes('massivo')) {
       // Massivo
       valor = parseFloat(provedor.valorMassivo) || 0;
-    } else if (nivel.includes('pré') || nivel.includes('pre')) {
-      // Pré-Venda
-      valor = parseFloat(provedor.valorPreVenda) || 0;
     }
 
     return `R$ ${valor.toFixed(2)}`;
@@ -286,6 +293,16 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
 
   return (
     <div className="table-container">
+      {/* Filtro por colaborador */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ marginRight: 8 }}>Filtrar por colaborador:</label>
+        <select value={filterColaborador} onChange={e => setFilterColaborador(e.target.value)}>
+          <option value="todos">Todos</option>
+          {[...new Set(chamados.map(c => c.usuario))].filter(Boolean).map(usuario => (
+            <option key={usuario} value={usuario}>{usuario}</option>
+          ))}
+        </select>
+      </div>
       {userTipo === 'Administrador' && selectedIds.length > 0 && (
         <div className="bulk-actions">
           <span>{selectedIds.length} chamado(s) selecionado(s)</span>
@@ -321,7 +338,37 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
           </tr>
         </thead>
         <tbody>
-          {chamados.map((chamado, index) => (
+          {chamados
+            .filter(c => filterColaborador === 'todos' || c.usuario === filterColaborador)
+            .sort((a, b) => {
+              // Ordena por data/hora decrescente (mais recente primeiro)
+              const parseDateTime = (dataHora) => {
+                if (!dataHora || typeof dataHora !== 'string') return -Infinity;
+                const [datePart, timePart] = dataHora.split(' ');
+                if (!/^\d{2}\/\d{2}\/\d{4}$/.test(datePart)) return -Infinity;
+                const [day, month, year] = datePart.split('/');
+                let hours = 0, minutes = 0, seconds = 0;
+                if (timePart && /^\d{2}:\d{2}:\d{2}$/.test(timePart)) {
+                  const [h, m, s] = timePart.split(':');
+                  hours = Number(h);
+                  minutes = Number(m);
+                  seconds = Number(s);
+                } else if (timePart && /^\d{2}:\d{2}$/.test(timePart)) {
+                  const [h, m] = timePart.split(':');
+                  hours = Number(h);
+                  minutes = Number(m);
+                }
+                // Fallback para garantir ordenação correta
+                const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day), hours, minutes, seconds);
+                return isNaN(timestamp) ? -Infinity : timestamp;
+              };
+              const aTime = parseDateTime(a.dataHora);
+              const bTime = parseDateTime(b.dataHora);
+              if (aTime === bTime) return 0;
+              if (aTime < bTime) return 1;
+              return -1;
+            })
+            .map((chamado, index) => (
             <tr key={chamado.id}>
               {userTipo === 'Administrador' && (
                 <td>
@@ -434,21 +481,41 @@ function TicketTable({ chamados, onRefresh, userTipo }) {
                   disabled={userTipo !== 'Administrador'}
                 >
                   <option value="">Selecione um nível</option>
-                  {niveis.map(niv => (
-                    <option key={niv} value={niv}>{niv}</option>
-                  ))}
+                  <option value="N1">N1</option>
+                  <option value="N2">N2</option>
+                  <option value="Massivo">Massivo</option>
+                  <option value="Pré Venda">Pré Venda</option>
+                  <option value="Venda Instalada">Venda Instalada</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label>Número</label>
-                <input
-                  type="text"
-                  value={editFormData.numero}
-                  onChange={(e) => setEditFormData({...editFormData, numero: e.target.value})}
-                  placeholder="Número do cliente"
-                  disabled={userTipo !== 'Administrador'}
-                />
+                {/* Campo Número removido */}
+                {editFormData.nivel === 'Venda Instalada' && (
+                  <div className="form-group">
+                    <label>Valor do Plano Contratado</label>
+                    <input
+                      type="text"
+                      value={editFormData.valorPlano || ''}
+                      onChange={(e) => {
+                        const valorPlano = e.target.value;
+                        let comissao = editFormData.comissao || 0;
+                        // Atualiza comissão automaticamente
+                        if (provedoresData.length > 0) {
+                          const provedor = provedoresData.find(p => p.nome === editFormData.provedor);
+                          if (provedor && provedor.comissao) {
+                            let percentual = Number(provedor.comissao);
+                            let valorPlanoNum = Number(valorPlano.replace(',', '.'));
+                            comissao = valorPlanoNum * (percentual / 100);
+                          }
+                        }
+                        setEditFormData({ ...editFormData, valorPlano, comissao });
+                      }}
+                      placeholder="Valor do plano"
+                      disabled={userTipo !== 'Administrador'}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="form-group">

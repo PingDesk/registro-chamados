@@ -84,11 +84,14 @@ function ChamadoForm({ onSave, onExit, initialData = {}, provedores = [], niveis
 
       <div className="row nivel-row">
         <label>Nível</label>
-        <div className="nivel-options">
-          <label><input type="radio" name="nivel" value="N1" checked={form.nivel === 'N1'} onChange={handleNivelChange} /> N1</label>
-          <label><input type="radio" name="nivel" value="N2" checked={form.nivel === 'N2'} onChange={handleNivelChange} /> N2</label>
-          <label><input type="radio" name="nivel" value="Massivo" checked={form.nivel === 'Massivo'} onChange={handleNivelChange} /> Massivo</label>
-        </div>
+        <select name="nivel" value={form.nivel} onChange={handleChange} required>
+          <option value="">Selecione um nível</option>
+          <option value="N1">N1</option>
+          <option value="N2">N2</option>
+          <option value="Massivo">Massivo</option>
+          <option value="Pré Venda">Pré Venda</option>
+          <option value="Venda Instalada">Venda Instalada</option>
+        </select>
       </div>
       <div className="row">
         <label>Descrição</label>

@@ -29,6 +29,7 @@ import TicketTable from '../components/TicketTable';
 import ChartsSection from '../components/ChartsSection';
 import Provedores from './Provedores';
 import Acessos from './Acessos';
+import Vendas from './Vendas';
 import './Dashboard.css';
 
 function Dashboard({ user, onLogout }) {
@@ -41,7 +42,7 @@ function Dashboard({ user, onLogout }) {
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
   const [providers, setProviders] = useState([]);
-  const [niveis, setNiveis] = useState(['N1', 'N2', 'Massivo']); // Pré Vendas removido
+  const [niveis, setNiveis] = useState(['N1', 'Pré Vendas', 'N2', 'Massivo', 'Venda Instalada']);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const fileInputRef = useRef(null);
@@ -88,19 +89,23 @@ function Dashboard({ user, onLogout }) {
         let nivel = '';
         if (nivelRaw === 'n1' || nivelRaw === 'nivel 1') {
           nivel = 'N1';
+        } else if (nivelRaw === 'pré venda' || nivelRaw === 'pre venda' || nivelRaw === 'pré-venda' || nivelRaw === 'pre-venda') {
+          nivel = 'Pré Venda';
         } else if (nivelRaw === 'n2' || nivelRaw === 'nivel 2') {
           nivel = 'N2';
         } else if (nivelRaw === 'massivo') {
           nivel = 'Massivo';
         } else {
-          nivel = '';
+          nivel = data.nivel || '';
         }
         return {
           id: doc.id,
           ...data,
           provedor: provedoresMap[data.provedor] || data.provedor,
           nivel: nivel,
-          usuario: usuariosMap[data.usuario] || data.usuario
+          usuario: usuariosMap[data.usuario] || data.usuario,
+          valorPlano: data.valorPlano ? String(data.valorPlano) : '',
+          dataInstalacao: data.dataInstalacao ? String(data.dataInstalacao) : ''
         };
       });
 
@@ -162,34 +167,58 @@ function Dashboard({ user, onLogout }) {
       filtered = filtered.filter(chamado => chamado.provedor === filterProvider);
     }
 
-    // Filtro de data inicial
-    if (filterDateStart) {
+    // Filtro de data inicial e final (DD/MM/AAAA)
+    if (filterDateStart && /^\d{2}\/\d{2}\/\d{4}$/.test(filterDateStart)) {
+      const [dStart, mStart, yStart] = filterDateStart.split('/');
+      const startDateObj = new Date(Number(yStart), Number(mStart) - 1, Number(dStart), 0, 0, 0);
       filtered = filtered.filter(chamado => {
         let dataHora = chamado.dataHora;
         if (typeof dataHora !== 'string') dataHora = String(dataHora);
         const chamadoDate = dataHora.split(' ')[0]; // Extrai apenas a data (DD/MM/YYYY)
-        if (!chamadoDate) return true;
+        if (!chamadoDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(chamadoDate)) return true;
         const [day, month, year] = chamadoDate.split('/');
-        const chamadoDateObj = new Date(year, month - 1, day);
-        const startDateObj = new Date(filterDateStart);
+        const chamadoDateObj = new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0);
         return chamadoDateObj >= startDateObj;
       });
     }
 
-    // Filtro de data final
-    if (filterDateEnd) {
+    if (filterDateEnd && /^\d{2}\/\d{2}\/\d{4}$/.test(filterDateEnd)) {
+      const [dEnd, mEnd, yEnd] = filterDateEnd.split('/');
+      const endDateObj = new Date(Number(yEnd), Number(mEnd) - 1, Number(dEnd), 23, 59, 59);
       filtered = filtered.filter(chamado => {
         let dataHora = chamado.dataHora;
         if (typeof dataHora !== 'string') dataHora = String(dataHora);
         const chamadoDate = dataHora.split(' ')[0];
-        if (!chamadoDate) return true;
+        if (!chamadoDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(chamadoDate)) return true;
         const [day, month, year] = chamadoDate.split('/');
-        const chamadoDateObj = new Date(year, month - 1, day);
-        const endDateObj = new Date(filterDateEnd);
+        const chamadoDateObj = new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59);
+        // Considera chamados mais antigos e mais recentes
         return chamadoDateObj <= endDateObj;
       });
     }
 
+    // Ordenar chamados por data decrescente (mais recentes primeiro)
+    filtered.sort((a, b) => {
+      const parseDateTime = (dataHora) => {
+        if (!dataHora || typeof dataHora !== 'string') return -Infinity;
+        const [datePart, timePart] = dataHora.split(' ');
+        if (!/^\d{2}\/\d{2}\/\d{4}$/.test(datePart)) return -Infinity;
+        const [day, month, year] = datePart.split('/');
+        let hours = 0, minutes = 0, seconds = 0;
+        if (timePart && /^\d{2}:\d{2}/.test(timePart)) {
+          const [h, m, s] = timePart.split(':');
+          hours = Number(h);
+          minutes = Number(m);
+          seconds = s ? Number(s) : 0;
+        }
+        return new Date(Number(year), Number(month) - 1, Number(day), hours, minutes, seconds).getTime();
+      };
+      const aTime = parseDateTime(a.dataHora);
+      const bTime = parseDateTime(b.dataHora);
+      if (aTime === bTime) return 0;
+      if (aTime < bTime) return 1;
+      return -1;
+    });
     setFilteredChamados(filtered);
   };
 
@@ -576,18 +605,31 @@ function Dashboard({ user, onLogout }) {
     };
 
     providers.forEach(provider => {
-      // Filtrar apenas chamados do provedor E dentro do período de fechamento
+      // Normalizar nomes para comparação robusta
+      const normalize = str => (str || '').toString().toLowerCase().normalize('NFD').replace(/[00-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+      const providerNomeNorm = normalize(provider.nome);
       const providerChamados = chamados.filter(c => 
-        c.provedor === provider.nome && isDentroPeriodoFechamento(c, provider)
+        normalize(c.provedor) === providerNomeNorm && isDentroPeriodoFechamento(c, provider)
       );
-      
+      // Considerar Pré Vendas como N1 para cálculo financeiro
+      const isPreVendas = c => {
+        const nivel = (c.nivel || '').toLowerCase();
+        // Só conta como pré-venda se ainda não foi convertida para venda instalada
+        return (
+          (nivel === 'pré vendas' || nivel === 'pre vendas' || nivel === 'pré-vendas' || nivel === 'pre-vendas' || nivel === 'pré venda' || nivel === 'pre venda' || nivel === 'pré-venda' || nivel === 'pre-venda')
+          && nivel !== 'venda instalada'
+        );
+      };
       const stats = {
         total: providerChamados.length,
-        nivel1: providerChamados.filter(c => c.nivel === 'N1').length, // total bruto
-        nivel2: providerChamados.filter(c => c.nivel === 'N2').length, // total bruto
+        nivel1: providerChamados.filter(c => {
+          const nivel = (c.nivel || '').toLowerCase();
+          return (nivel === 'n1' || isPreVendas(c));
+        }).length, // N1 + Pré Vendas (não convertidas)
+        nivel2: providerChamados.filter(c => c.nivel === 'N2').length,
         vendas: providerChamados.filter(c => {
-          const nivel = c.nivel?.toLowerCase() || '';
-          return nivel.includes('venda');
+          const nivel = (c.nivel || '').toLowerCase().trim();
+          return nivel === 'venda instalada';
         }).length,
         massivo: providerChamados.filter(c => {
           const nivel = c.nivel?.toLowerCase() || '';
@@ -597,9 +639,9 @@ function Dashboard({ user, onLogout }) {
 
       // Calcular valores considerando franquia (apenas excedente, FIFO)
       const franquia = provider.franquia || 0;
-      // Ordena chamados N1 e N2 por data de abertura (FIFO)
+      // Ordena chamados N1, Pré Vendas e N2 por data de abertura (FIFO)
       const chamadosN1N2 = providerChamados
-        .filter(c => c.nivel === 'N1' || c.nivel === 'N2')
+        .filter(c => c.nivel === 'N1' || c.nivel === 'N2' || isPreVendas(c))
         .sort((a, b) => {
           const dataA = typeof a.dataHora === 'string' ? a.dataHora : String(a.dataHora || '');
           const dataB = typeof b.dataHora === 'string' ? b.dataHora : String(b.dataHora || '');
@@ -608,8 +650,8 @@ function Dashboard({ user, onLogout }) {
 
       // Os primeiros 'franquia' chamados não são cobrados
       const chamadosExcedentes = chamadosN1N2.slice(franquia);
-      // Conta quantos excedentes são N1 e quantos são N2
-      const nivel1Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N1').length;
+      // Conta quantos excedentes são N1 e quantos são N2 (Pré Vendas contam como N1)
+      const nivel1Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N1' || isPreVendas(c)).length;
       const nivel2Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N2').length;
 
       const valores = {
@@ -622,12 +664,19 @@ function Dashboard({ user, onLogout }) {
         }).length * (provider.valorMassivo || 0),
         vendas: providerChamados
           .filter(c => {
-            const nivel = c.nivel?.toLowerCase() || '';
-            return nivel.includes('venda');
+            const nivel = (c.nivel || '').toLowerCase().trim();
+            return nivel === 'venda instalada';
           })
           .reduce((total, chamado) => {
-            // Se tiver comissão calculada, usa ela; senão, usa 0
-            return total + (chamado.comissao || 0);
+            let comissao = Number(chamado.comissao);
+            if (!comissao || comissao === 0) {
+              let percentual = provider.comissao ? Number(provider.comissao) : 0;
+              let valorPlanoStr = chamado.valorPlano ? String(chamado.valorPlano).replace(/\s/g, '') : '0';
+              if (valorPlanoStr.includes(',')) valorPlanoStr = valorPlanoStr.replace(',', '.');
+              let valorPlano = Number(valorPlanoStr);
+              comissao = valorPlano * (percentual / 100);
+            }
+            return total + comissao;
           }, 0)
       };
 
@@ -640,7 +689,86 @@ function Dashboard({ user, onLogout }) {
   };
 
   const valores = calculateValues();
-  const byProvider = calculateByProvider();
+  // Usar os chamados filtrados para os indicadores exibidos apenas se houver filtro de provedor
+  const byProvider = filterProvider !== 'todos'
+    ? (() => {
+        const provedorFiltrado = providers.find(p => p.nome === filterProvider);
+        if (!provedorFiltrado) return {};
+        // ...lógica do provedor filtrado permanece igual...
+        const chamadosFiltrados = filteredChamados.filter(c => c.provedor === filterProvider);
+        const normalize = str => (str || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+        const providerNomeNorm = normalize(provedorFiltrado.nome);
+        const providerChamados = chamadosFiltrados.filter(c => normalize(c.provedor) === providerNomeNorm);
+        const isPreVendas = c => {
+          const nivel = (c.nivel || '').toLowerCase();
+          return (
+            (nivel === 'pré vendas' || nivel === 'pre vendas' || nivel === 'pré-vendas' || nivel === 'pre-vendas' || nivel === 'pré venda' || nivel === 'pre venda' || nivel === 'pré-venda' || nivel === 'pre-venda')
+            && nivel !== 'venda instalada'
+          );
+        };
+        const stats = {
+          total: providerChamados.length,
+          nivel1: providerChamados.filter(c => {
+            const nivel = (c.nivel || '').toLowerCase();
+            return (nivel === 'n1' || isPreVendas(c));
+          }).length,
+          nivel2: providerChamados.filter(c => c.nivel === 'N2').length,
+          vendas: providerChamados.filter(c => {
+            const nivel = (c.nivel || '').toLowerCase().trim();
+            return nivel === 'venda instalada';
+          }).length,
+          massivo: providerChamados.filter(c => {
+            const nivel = c.nivel?.toLowerCase() || '';
+            return nivel.includes('massivo');
+          }).length
+        };
+        const franquia = provedorFiltrado.franquia || 0;
+        const chamadosN1N2 = providerChamados
+          .filter(c => c.nivel === 'N1' || c.nivel === 'N2' || isPreVendas(c))
+          .sort((a, b) => {
+            const dataA = typeof a.dataHora === 'string' ? a.dataHora : String(a.dataHora || '');
+            const dataB = typeof b.dataHora === 'string' ? b.dataHora : String(b.dataHora || '');
+            return dataA.localeCompare(dataB);
+          });
+        const chamadosExcedentes = chamadosN1N2.slice(franquia);
+        const nivel1Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N1' || isPreVendas(c)).length;
+        const nivel2Cobrados = chamadosExcedentes.filter(c => c.nivel === 'N2').length;
+        const valores = {
+          fixo: provedorFiltrado.valorFixo || 0,
+          nivel1: nivel1Cobrados * (provedorFiltrado.valorNivel1 || 0),
+          nivel2: nivel2Cobrados * (provedorFiltrado.valorNivel2 || 0),
+          massivo: providerChamados.filter(c => {
+            const nivel = c.nivel?.toLowerCase() || '';
+            return nivel.includes('massivo');
+          }).length * (provedorFiltrado.valorMassivo || 0),
+          vendas: providerChamados
+            .filter(c => {
+              const nivel = (c.nivel || '').toLowerCase().trim();
+              return nivel === 'venda instalada';
+            })
+            .reduce((total, chamado) => {
+              let comissao = Number(chamado.comissao);
+              if (!comissao || comissao === 0) {
+                let percentual = provedorFiltrado.comissao ? Number(provedorFiltrado.comissao) : 0;
+                let valorPlanoStr = chamado.valorPlano ? String(chamado.valorPlano).replace(/\s/g, '') : '0';
+                if (valorPlanoStr.includes(',')) valorPlanoStr = valorPlanoStr.replace(',', '.');
+                let valorPlano = Number(valorPlanoStr);
+                comissao = valorPlano * (percentual / 100);
+              }
+              return total + comissao;
+            }, 0)
+        };
+        valores.total = valores.fixo + valores.nivel1 + valores.nivel2 + valores.massivo + valores.vendas;
+        return {
+          [provedorFiltrado.nome]: {
+            stats,
+            valores,
+            provider: provedorFiltrado,
+            franquia: provedorFiltrado.franquia || 0
+          }
+        };
+      })()
+    : calculateByProvider();
 
   const stats = {
     total: chamados.length,
@@ -653,8 +781,8 @@ function Dashboard({ user, onLogout }) {
       return nivel.includes('nível 2') || nivel.includes('nivel 2');
     }).length,
     vendas: chamados.filter(c => {
-      const nivel = c.nivel?.toLowerCase() || '';
-      return nivel.includes('venda');
+      const nivel = (c.nivel || '').toLowerCase().trim();
+      return nivel === 'venda instalada';
     }).length,
     massivo: chamados.filter(c => {
       const nivel = c.nivel?.toLowerCase() || '';
@@ -700,13 +828,19 @@ function Dashboard({ user, onLogout }) {
           {user.tipo === 'Administrador' && (
             <>
               <button 
+                className={`nav-item ${currentPage === 'vendas' ? 'active' : ''}`}
+                onClick={() => setCurrentPage('vendas')}
+              >
+                <ShoppingCart size={20} />
+                {sidebarOpen && <span>Vendas</span>}
+              </button>
+              <button 
                 className={`nav-item ${currentPage === 'provedores' ? 'active' : ''}`}
                 onClick={() => setCurrentPage('provedores')}
               >
                 <Building2 size={20} />
                 {sidebarOpen && <span>Provedores</span>}
               </button>
-              
               <button 
                 className={`nav-item ${currentPage === 'acessos' ? 'active' : ''}`}
                 onClick={() => setCurrentPage('acessos')}
@@ -826,13 +960,36 @@ function Dashboard({ user, onLogout }) {
               {/* Indicadores por Provedor */}
               {Object.keys(byProvider).map(providerName => {
                 const data = byProvider[providerName];
+                // Só exibe provedor se houver pelo menos 1 chamado com nível exatamente N1, N2, Massivo, Venda Instalada ou Pré Venda
+                const chamadosValidos = (data && data.provider && chamados.filter(c => {
+                  const normalize = str => (str || '').toString().toLowerCase().normalize('NFD').replace(/\s+/g, ' ').replace(/[\u0300-\u036f]/g, '').trim();
+                  const nivel = normalize(c.nivel);
+                  const provedor = normalize(c.provedor);
+                  const provedorData = normalize(data.provider.nome);
+                  return provedor === provedorData && (
+                    nivel === 'n1' ||
+                    nivel === 'n2' ||
+                    nivel === 'massivo' ||
+                    nivel === 'venda instalada' ||
+                    nivel === 'pré venda' ||
+                    nivel === 'pre venda'
+                  );
+                }));
+                if (data && data.provider) {
+                  // eslint-disable-next-line no-console
+                  console.log(`Provedor: ${data.provider.nome} | Chamados válidos (${chamadosValidos.length}):`);
+                  chamadosValidos.forEach((chamado, idx) => {
+                    console.log(`  [${idx+1}]`, chamado);
+                  });
+                }
+                if (!chamadosValidos || chamadosValidos.length === 0) return null;
                 return (
                   <div key={providerName} className="provider-section">
                     <h3 className="provider-title">
                       <Building2 size={24} />
                       {providerName}
                     </h3>
-                    
+                    {/* ...existing code... */}
                     <div className="provider-content">
                       {/* Indicadores de Chamados */}
                       <div className="stats-subsection">
@@ -840,31 +997,31 @@ function Dashboard({ user, onLogout }) {
                         <div className="stats-grid-compact">
                           <StatsCard 
                             title="Total" 
-                            value={data.stats.total} 
+                            value={chamadosValidos.length} 
                             icon={<TrendingUp />}
                             color="#667eea"
                           />
                           <StatsCard 
                             title="Nível 1" 
-                            value={data.stats.nivel1} 
+                            value={chamadosValidos.filter(c => c.nivel === 'N1').length} 
                             icon={<AlertCircle />}
                             color="#f59e0b"
                           />
                           <StatsCard 
                             title="Nível 2" 
-                            value={data.stats.nivel2} 
+                            value={chamadosValidos.filter(c => c.nivel === 'N2').length} 
                             icon={<Clock />}
                             color="#3b82f6"
                           />
                           <StatsCard 
                             title="Vendas" 
-                            value={data.stats.vendas} 
+                            value={chamadosValidos.filter(c => c.nivel === 'Venda Instalada').length} 
                             icon={<ShoppingCart />}
                             color="#10b981"
                           />
                           <StatsCard 
                             title="Massivos" 
-                            value={data.stats.massivo} 
+                            value={chamadosValidos.filter(c => c.nivel === 'Massivo').length} 
                             icon={<Zap />}
                             color="#8b5cf6"
                           />
@@ -877,38 +1034,64 @@ function Dashboard({ user, onLogout }) {
                         <div className="stats-grid-compact">
                           <StatsCard 
                             title="Valor Fixo" 
-                            value={`R$ ${data.valores.fixo.toFixed(2)}`} 
+                            value={`R$ ${data.provider.valorFixo ? Number(data.provider.valorFixo).toFixed(2) : '0.00'}`} 
                             icon={<DollarSign />}
                             color="#6366f1"
                           />
                           <StatsCard 
                             title="Nível 1" 
-                            value={`R$ ${data.valores.nivel1.toFixed(2)}`} 
+                            value={`R$ ${(chamadosValidos.filter(c => c.nivel === 'N1' || c.nivel === 'Pré Venda').length * (data.provider.valorNivel1 || 0)).toFixed(2)}`} 
                             icon={<DollarSign />}
                             color="#f59e0b"
                           />
                           <StatsCard 
                             title="Nível 2" 
-                            value={`R$ ${data.valores.nivel2.toFixed(2)}`} 
+                            value={`R$ ${(chamadosValidos.filter(c => c.nivel === 'N2').length * (data.provider.valorNivel2 || 0)).toFixed(2)}`} 
                             icon={<DollarSign />}
                             color="#3b82f6"
                           />
                           <StatsCard 
                             title="Massivo" 
-                            value={`R$ ${data.valores.massivo.toFixed(2)}`} 
+                            value={`R$ ${(chamadosValidos.filter(c => c.nivel === 'Massivo').length * (data.provider.valorMassivo || 0)).toFixed(2)}`} 
                             icon={<DollarSign />}
                             color="#8b5cf6"
                           />
 
                           <StatsCard 
                             title="Vendas" 
-                            value={`R$ ${data.valores.vendas.toFixed(2)}`} 
+                            value={`R$ ${chamadosValidos.filter(c => c.nivel === 'Venda Instalada').reduce((total, chamado) => {
+                              let comissao = Number(chamado.comissao);
+                              if (!comissao || comissao === 0) {
+                                let percentual = data.provider.comissao ? Number(data.provider.comissao) : 0;
+                                let valorPlanoStr = chamado.valorPlano ? String(chamado.valorPlano).replace(/\s/g, '') : '0';
+                                if (valorPlanoStr.includes(',')) valorPlanoStr = valorPlanoStr.replace(',', '.');
+                                let valorPlano = Number(valorPlanoStr);
+                                comissao = valorPlano * (percentual / 100);
+                              }
+                              return total + comissao;
+                            }, 0).toFixed(2)}`} 
                             icon={<DollarSign />}
                             color="#10b981"
                           />
                           <StatsCard 
                             title="Total" 
-                            value={`R$ ${data.valores.total.toFixed(2)}`} 
+                            value={`R$ ${(
+                              (data.provider.valorFixo ? Number(data.provider.valorFixo) : 0) +
+                              (chamadosValidos.filter(c => c.nivel === 'N1' || c.nivel === 'Pré Venda').length * (data.provider.valorNivel1 || 0)) +
+                              (chamadosValidos.filter(c => c.nivel === 'N2').length * (data.provider.valorNivel2 || 0)) +
+                              (chamadosValidos.filter(c => c.nivel === 'Massivo').length * (data.provider.valorMassivo || 0)) +
+                              (chamadosValidos.filter(c => c.nivel === 'Venda Instalada').reduce((total, chamado) => {
+                                let comissao = Number(chamado.comissao);
+                                if (!comissao || comissao === 0) {
+                                  let percentual = data.provider.comissao ? Number(data.provider.comissao) : 0;
+                                  let valorPlanoStr = chamado.valorPlano ? String(chamado.valorPlano).replace(/\s/g, '') : '0';
+                                  if (valorPlanoStr.includes(',')) valorPlanoStr = valorPlanoStr.replace(',', '.');
+                                  let valorPlano = Number(valorPlanoStr);
+                                  comissao = valorPlano * (percentual / 100);
+                                }
+                                return total + comissao;
+                              }, 0))
+                            ).toFixed(2)}`} 
                             icon={<DollarSign />}
                             color="#667eea"
                           />
@@ -940,8 +1123,10 @@ function Dashboard({ user, onLogout }) {
                     <select value={filterNivel} onChange={(e) => setFilterNivel(e.target.value)}>
                       <option value="todos">Todos os Níveis</option>
                       <option value="N1">Nível 1</option>
+                      <option value="Pré Venda">Pré Venda</option>
                       <option value="N2">Nível 2</option>
                       <option value="Massivo">Massivo</option>
+                      <option value="Venda Instalada">Venda Instalada</option>
                     </select>
                   </div>
 
@@ -958,20 +1143,38 @@ function Dashboard({ user, onLogout }) {
                   <div className="filter-group">
                     <Calendar size={18} />
                     <input
-                      type="date"
+                      type="text"
                       value={filterDateStart}
-                      onChange={(e) => setFilterDateStart(e.target.value)}
-                      placeholder="Data inicial"
+                      onChange={e => {
+                        // Aceita apenas DD/MM/AAAA
+                        const val = e.target.value.replace(/[^0-9\/]/g, '');
+                        if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                          setFilterDateStart(val);
+                        } else {
+                          setFilterDateStart(val);
+                        }
+                      }}
+                      placeholder="Data inicial (DD/MM/AAAA)"
+                      maxLength={10}
                     />
                   </div>
 
                   <div className="filter-group">
                     <Calendar size={18} />
                     <input
-                      type="date"
+                      type="text"
                       value={filterDateEnd}
-                      onChange={(e) => setFilterDateEnd(e.target.value)}
-                      placeholder="Data final"
+                      onChange={e => {
+                        // Aceita apenas DD/MM/AAAA
+                        const val = e.target.value.replace(/[^0-9\/]/g, '');
+                        if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                          setFilterDateEnd(val);
+                        } else {
+                          setFilterDateEnd(val);
+                        }
+                      }}
+                      placeholder="Data final (DD/MM/AAAA)"
+                      maxLength={10}
                     />
                   </div>
 
@@ -1000,6 +1203,8 @@ function Dashboard({ user, onLogout }) {
 
               <TicketTable chamados={filteredChamados} onRefresh={loadData} userTipo={user.tipo} />
             </>
+          ) : currentPage === 'vendas' ? (
+            <Vendas />
           ) : currentPage === 'provedores' ? (
             <Provedores />
           ) : currentPage === 'acessos' ? (
